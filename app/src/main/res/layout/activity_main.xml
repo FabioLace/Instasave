@@ -1,0 +1,45 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/canvas"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="18dp"
+        android:paddingBottom="24dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="instasave" android:textColor="@color/ink" android:textSize="26sp" android:textStyle="bold" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="I tuoi download" android:textColor="@color/muted" android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="38dp" android:text="Salva ciò che ti serve." android:textColor="@color/ink" android:textSize="28sp" android:textStyle="bold" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Incolla un link o condividilo da Instagram." android:textColor="@color/muted" android:textSize="16sp" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="28dp" android:orientation="horizontal">
+            <EditText android:id="@+id/urlInput" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:background="@drawable/bg_input" android:hint="Link Instagram" android:inputType="textUri" android:maxLines="1" android:textColor="@color/ink" android:textColorHint="@color/muted" android:textSize="16sp" />
+            <Button android:id="@+id/pasteButton" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="8dp" android:backgroundTint="@color/surface" android:text="Incolla" android:textColor="@color/accent" android:textAllCaps="false" />
+        </LinearLayout>
+
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp" android:text="TIPO DI CONTENUTO" android:textColor="@color/muted" android:textSize="11sp" android:textStyle="bold" />
+        <RadioGroup android:id="@+id/typeGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+            <RadioButton android:id="@+id/typeAuto" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:background="@drawable/bg_chip" android:button="@null" android:checked="true" android:gravity="center" android:paddingHorizontal="6dp" android:text="Auto" android:textColor="@color/ink" />
+            <RadioButton android:id="@+id/typePhoto" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:background="@drawable/bg_chip" android:button="@null" android:gravity="center" android:paddingHorizontal="6dp" android:text="Foto" android:textColor="@color/ink" />
+            <RadioButton android:id="@+id/typeVideo" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:background="@drawable/bg_chip" android:button="@null" android:gravity="center" android:paddingHorizontal="6dp" android:text="Video" android:textColor="@color/ink" />
+            <RadioButton android:id="@+id/typeStory" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:background="@drawable/bg_chip" android:button="@null" android:gravity="center" android:paddingHorizontal="6dp" android:text="Storia" android:textColor="@color/ink" />
+        </RadioGroup>
+
+        <Button android:id="@+id/analyzeButton" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="22dp" android:background="@drawable/bg_primary" android:enabled="false" android:text="Analizza link" android:textAllCaps="false" android:textColor="@color/surface" android:textSize="16sp" android:textStyle="bold" />
+        <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:textColor="@color/muted" android:textSize="13sp" android:visibility="gone" />
+
+        <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="38dp" android:background="@color/line" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="RECENTI" android:textColor="@color/muted" android:textSize="11sp" android:textStyle="bold" />
+        <LinearLayout android:id="@+id/historyContainer" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical" />
+        <TextView android:id="@+id/emptyHistory" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="Nessun download recente" android:textColor="@color/muted" android:textSize="15sp" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="36dp" android:gravity="center" android:text="Scarica soltanto contenuti che possiedi o per cui hai il permesso." android:textColor="@color/muted" android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

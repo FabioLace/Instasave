@@ -1,0 +1,11 @@
+<resources>
+    <color name="ink">#171A21</color>
+    <color name="muted">#69707D</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="canvas">#F5F6F8</color>
+    <color name="line">#E2E5EA</color>
+    <color name="accent">#EA4C69</color>
+    <color name="accent_dark">#C93653</color>
+    <color name="accent_soft">#FDECEF</color>
+    <color name="success">#1B8757</color>
+</resources>
