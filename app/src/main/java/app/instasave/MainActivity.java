@@ -2,6 +2,7 @@ package app.instasave;
 
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.content.ContentValues;
 import android.graphics.BitmapFactory;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -9,7 +10,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -168,12 +171,63 @@ public final class MainActivity extends Activity {
     }
 
     private void enqueueDownload(MediaResolver.MediaItem item) {
+        if ("photo".equals(item.type)) {
+            savePhotoAsJpeg(item);
+            return;
+        }
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(item.downloadUrl));
         request.setTitle(item.filename);
         request.setDescription("Salvataggio in Download/Instasave");
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Instasave/" + item.filename);
         ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(request);
+    }
+
+    private void savePhotoAsJpeg(MediaResolver.MediaItem item) {
+        executor.execute(() -> {
+            Uri destination = null;
+            try {
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(item.downloadUrl).openConnection();
+                connection.setConnectTimeout(10_000);
+                connection.setReadTimeout(20_000);
+                connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
+                android.graphics.Bitmap image;
+                try (java.io.InputStream stream = connection.getInputStream()) {
+                    image = BitmapFactory.decodeStream(stream);
+                } finally {
+                    connection.disconnect();
+                }
+                if (image == null) throw new IllegalStateException("Il file ricevuto non è un'immagine valida.");
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    throw new IllegalStateException("Il salvataggio JPEG richiede Android 10 o successivo.");
+                }
+
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, jpegFilename(item.filename));
+                values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Instasave");
+                values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                destination = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                if (destination == null) throw new IllegalStateException("Impossibile creare il file JPEG.");
+                try (java.io.OutputStream output = getContentResolver().openOutputStream(destination)) {
+                    if (output == null || !image.compress(android.graphics.Bitmap.CompressFormat.JPEG, 100, output)) {
+                        throw new IllegalStateException("Impossibile convertire l'immagine in JPEG.");
+                    }
+                }
+                values.clear();
+                values.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                getContentResolver().update(destination, values, null, null);
+                runOnUiThread(() -> showStatus("Foto JPEG salvata in Download/Instasave.", false));
+            } catch (Exception error) {
+                if (destination != null) getContentResolver().delete(destination, null, null);
+                runOnUiThread(() -> showStatus(error.getMessage(), true));
+            }
+        });
+    }
+
+    private static String jpegFilename(String filename) {
+        int dot = filename.lastIndexOf('.');
+        return (dot > 0 ? filename.substring(0, dot) : filename) + ".jpg";
     }
 
     private String selectedType() {

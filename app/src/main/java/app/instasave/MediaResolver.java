@@ -22,6 +22,12 @@ final class MediaResolver {
     private static final Pattern JSON_SCRIPT = Pattern.compile(
             "<script[^>]+type=[\\\"']application/json[\\\"'][^>]*>(.*?)</script>",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern EMBEDDED_MEDIA_IMAGE = Pattern.compile(
+            "<img(?=[^>]*\\bclass=[\\\"'][^\\\"']*\\bEmbeddedMediaImage\\b[^\\\"']*[\\\"'])[^>]*>",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern HTML_ATTRIBUTE = Pattern.compile(
+            "\\b%s=[\\\"'](.*?)[\\\"']", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern SRCSET_ENTRY = Pattern.compile("(.+?)\\s+(\\d+)w");
 
     static final class MediaItem {
         final String downloadUrl;
@@ -50,7 +56,8 @@ final class MediaResolver {
     Result resolve(String sourceUrl, String requestedType) throws Exception {
         if (isDirectMediaUrl(sourceUrl)) {
             String type = sourceUrl.toLowerCase(Locale.ROOT).contains(".mp4") ? "video" : "photo";
-            MediaItem item = new MediaItem(sourceUrl, "instasave_" + System.currentTimeMillis() + extensionFor(sourceUrl),
+            String extension = type.equals("photo") ? ".jpg" : extensionFor(sourceUrl, ".mp4");
+            MediaItem item = new MediaItem(sourceUrl, "instasave_" + System.currentTimeMillis() + extension,
                     type, type.equals("photo") ? sourceUrl : null);
             return new Result(Collections.singletonList(item));
         }
@@ -62,7 +69,8 @@ final class MediaResolver {
 
         // Instagram embeds the page's own GraphQL response as inline JSON; when present it gives
         // full-resolution URLs and carousel items, so it's tried before falling back to og: tags.
-        JSONObject mediaNode = findMediaNode(html);
+        String shortcode = shortcodeFrom(sourceUrl);
+        JSONObject mediaNode = findMediaNode(html, shortcode);
         if (mediaNode != null) {
             List<MediaItem> items = mediaItemsFrom(mediaNode);
             if (!items.isEmpty()) return new Result(items);
@@ -70,14 +78,19 @@ final class MediaResolver {
 
         String videoUrl = openGraphContent(html, "og:video:secure_url");
         if (videoUrl == null) videoUrl = openGraphContent(html, "og:video");
-        String imageUrl = openGraphContent(html, "og:image");
-        String mediaUrl = videoUrl != null ? videoUrl : imageUrl;
-        if (mediaUrl == null) {
+        if (videoUrl != null) {
+            String filename = "instasave_" + System.currentTimeMillis() + extensionFor(videoUrl, ".mp4");
+            return new Result(Collections.singletonList(new MediaItem(videoUrl, filename, "video", null)));
+        }
+
+        // The permalink page exposes og:image only as a small, often cropped preview. Instagram's
+        // public embed exposes the post image and its responsive sources, including the largest one.
+        String imageUrl = imageFromPublicEmbed(sourceUrl, shortcode);
+        if (imageUrl == null) {
             throw new IllegalStateException("Instagram non ha esposto un media scaricabile per questo contenuto.");
         }
-        String type = videoUrl != null ? "video" : "photo";
-        String filename = "instasave_" + System.currentTimeMillis() + (type.equals("video") ? ".mp4" : ".jpg");
-        return new Result(Collections.singletonList(new MediaItem(mediaUrl, filename, type, imageUrl)));
+        String filename = "instasave_" + System.currentTimeMillis() + ".jpg";
+        return new Result(Collections.singletonList(new MediaItem(imageUrl, filename, "photo", imageUrl)));
     }
 
     private static String fetchHtml(String url) throws Exception {
@@ -101,13 +114,13 @@ final class MediaResolver {
         return body.toString();
     }
 
-    private static JSONObject findMediaNode(String html) {
+    private static JSONObject findMediaNode(String html, String expectedShortcode) {
         Matcher matcher = JSON_SCRIPT.matcher(html);
         while (matcher.find()) {
             String content = matcher.group(1);
             if (!content.contains("shortcode_media")) continue;
             try {
-                JSONObject found = searchForMediaNode(new JSONObject(content));
+                JSONObject found = searchForMediaNode(new JSONObject(content), expectedShortcode);
                 if (found != null) return found;
             } catch (Exception ignored) { }
         }
@@ -117,21 +130,24 @@ final class MediaResolver {
     // Field names below (xdt_shortcode_media / shortcode_media) come from Instagram's own internal
     // GraphQL response, embedded for client-side rendering. Unofficial and undocumented, so any
     // resolve() call that doesn't find this shape falls back to og: tags instead of failing outright.
-    private static JSONObject searchForMediaNode(Object node) {
+    private static JSONObject searchForMediaNode(Object node, String expectedShortcode) {
         if (node instanceof JSONObject) {
             JSONObject obj = (JSONObject) node;
             Object direct = obj.opt("xdt_shortcode_media");
             if (direct == null) direct = obj.opt("shortcode_media");
-            if (direct instanceof JSONObject) return (JSONObject) direct;
+            if (direct instanceof JSONObject) {
+                JSONObject media = (JSONObject) direct;
+                if (matchesShortcode(media, expectedShortcode)) return media;
+            }
             Iterator<String> keys = obj.keys();
             while (keys.hasNext()) {
-                JSONObject found = searchForMediaNode(obj.opt(keys.next()));
+                JSONObject found = searchForMediaNode(obj.opt(keys.next()), expectedShortcode);
                 if (found != null) return found;
             }
         } else if (node instanceof JSONArray) {
             JSONArray array = (JSONArray) node;
             for (int i = 0; i < array.length(); i++) {
-                JSONObject found = searchForMediaNode(array.opt(i));
+                JSONObject found = searchForMediaNode(array.opt(i), expectedShortcode);
                 if (found != null) return found;
             }
         }
@@ -156,13 +172,127 @@ final class MediaResolver {
 
     private static void addMediaItem(List<MediaItem> items, JSONObject node, int index) {
         boolean isVideo = node.optBoolean("is_video", false);
-        String displayUrl = node.optString("display_url", null);
-        String videoUrl = node.optString("video_url", null);
+        String displayUrl = bestImageUrl(node);
+        String videoUrl = nonEmpty(node.optString("video_url", null));
         String url = isVideo && videoUrl != null ? videoUrl : displayUrl;
         if (url == null) return;
         String type = isVideo && videoUrl != null ? "video" : "photo";
-        String filename = "instasave_" + System.currentTimeMillis() + "_" + index + (type.equals("video") ? ".mp4" : ".jpg");
+        String filename = "instasave_" + System.currentTimeMillis() + "_" + index
+                + (type.equals("video") ? extensionFor(url, ".mp4") : ".jpg");
         items.add(new MediaItem(url, filename, type, displayUrl));
+    }
+
+    private static String imageFromPublicEmbed(String sourceUrl, String shortcode) {
+        try {
+            String embedUrl = sourceUrl.replaceFirst("[?#].*$", "");
+            if (!embedUrl.endsWith("/")) embedUrl += "/";
+            String html = fetchHtml(embedUrl + "embed/");
+            if (shortcode == null || !html.contains(shortcode) || isInstagramErrorPage(html)) return null;
+            Matcher imageMatch = EMBEDDED_MEDIA_IMAGE.matcher(html);
+            if (!imageMatch.find()) return null;
+            String tag = imageMatch.group();
+            String best = bestFromSrcSet(attribute(tag, "srcset"));
+            return best != null ? best : attribute(tag, "src");
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String attribute(String tag, String name) {
+        Matcher match = Pattern.compile(String.format(Locale.ROOT, HTML_ATTRIBUTE.pattern(), Pattern.quote(name)),
+                HTML_ATTRIBUTE.flags()).matcher(tag);
+        return match.find() ? Html.fromHtml(match.group(1), Html.FROM_HTML_MODE_LEGACY).toString() : null;
+    }
+
+    private static String bestFromSrcSet(String srcSet) {
+        if (srcSet == null) return null;
+        String bestUrl = null;
+        int bestWidth = -1;
+        for (String entry : srcSet.split(",")) {
+            Matcher match = SRCSET_ENTRY.matcher(entry.trim());
+            if (!match.matches()) continue;
+            int width = Integer.parseInt(match.group(2));
+            if (width > bestWidth) {
+                bestWidth = width;
+                bestUrl = match.group(1).trim();
+            }
+        }
+        return bestUrl;
+    }
+
+    private static boolean matchesShortcode(JSONObject media, String expectedShortcode) {
+        if (expectedShortcode == null) return false;
+        String shortcode = nonEmpty(media.optString("shortcode", null));
+        if (shortcode == null) shortcode = nonEmpty(media.optString("code", null));
+        return expectedShortcode.equals(shortcode);
+    }
+
+    /**
+     * Instagram can expose several resized versions. Pick the largest declared one rather than
+     * blindly using the first thumbnail returned by the page data.
+     */
+    private static String bestImageUrl(JSONObject node) {
+        String bestUrl = nonEmpty(node.optString("display_url", null));
+        long bestArea = 0;
+        JSONArray displayResources = node.optJSONArray("display_resources");
+        ImageCandidate displayCandidate = bestCandidate(displayResources, "src", "config_width", "config_height");
+        if (displayCandidate != null) {
+            bestUrl = displayCandidate.url;
+            bestArea = displayCandidate.area;
+        }
+
+        JSONObject imageVersions = node.optJSONObject("image_versions2");
+        if (imageVersions != null) {
+            ImageCandidate versionCandidate = bestCandidate(imageVersions.optJSONArray("candidates"), "url", "width", "height");
+            if (versionCandidate != null && versionCandidate.area >= bestArea) bestUrl = versionCandidate.url;
+        }
+        return bestUrl;
+    }
+
+    private static ImageCandidate bestCandidate(JSONArray candidates, String urlKey, String widthKey, String heightKey) {
+        if (candidates == null) return null;
+        ImageCandidate best = null;
+        for (int i = 0; i < candidates.length(); i++) {
+            JSONObject candidate = candidates.optJSONObject(i);
+            if (candidate == null) continue;
+            String url = nonEmpty(candidate.optString(urlKey, null));
+            if (url == null) continue;
+            long area = (long) candidate.optInt(widthKey, 0) * candidate.optInt(heightKey, 0);
+            if (best == null || area > best.area) best = new ImageCandidate(url, area);
+        }
+        return best;
+    }
+
+    private static String shortcodeFrom(String url) {
+        if (url == null) return null;
+        try {
+            String[] segments = new URI(url).getPath().split("/");
+            for (int i = 0; i + 1 < segments.length; i++) {
+                if ("p".equals(segments[i]) || "reel".equals(segments[i]) || "tv".equals(segments[i])) {
+                    return nonEmpty(segments[i + 1]);
+                }
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
+
+    private static boolean isInstagramErrorPage(String html) {
+        return html.contains("PolarisErrorRoot.entrypoint")
+                || html.contains("\"pageID\":\"httpErrorPage\"");
+    }
+
+    private static String nonEmpty(String value) {
+        return value == null || value.isEmpty() ? null : value;
+    }
+
+    private static final class ImageCandidate {
+        final String url;
+        final long area;
+
+        ImageCandidate(String url, long area) {
+            this.url = url;
+            this.area = area;
+        }
     }
 
     private static boolean isDirectMediaUrl(String url) {
@@ -171,9 +301,13 @@ final class MediaResolver {
     }
 
     private static String extensionFor(String url) {
+        return extensionFor(url, ".mp4");
+    }
+
+    private static String extensionFor(String url, String fallback) {
         String clean = url.toLowerCase(Locale.ROOT).split("\\?")[0];
         int index = clean.lastIndexOf('.');
-        return index > clean.lastIndexOf('/') ? clean.substring(index) : ".mp4";
+        return index > clean.lastIndexOf('/') ? clean.substring(index) : fallback;
     }
 
     private static boolean isInstagramPermalink(String url) {
