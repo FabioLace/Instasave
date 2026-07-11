@@ -3,8 +3,8 @@ package app.instasave;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ContentValues;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -24,6 +24,9 @@ import android.widget.TextView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -83,7 +86,7 @@ public final class MainActivity extends Activity {
             if (shared != null) {
                 urlInput.setText(extractUrl(shared));
                 urlInput.setSelection(urlInput.length());
-                    showStatus("Link ricevuto da Instagram. Pronto per l'analisi.", false);
+                showStatus("Link ricevuto da Instagram. Pronto per l'analisi.", false);
             }
         }
     }
@@ -94,7 +97,7 @@ public final class MainActivity extends Activity {
         showStatus("Analisi del contenuto in corso...", false);
         executor.execute(() -> {
             try {
-                MediaResolver.Result result = new MediaResolver().resolve(source, "auto");
+                MediaResolver.Result result = new MediaResolver().resolve(source);
                 runOnUiThread(() -> {
                     pendingResult = result;
                     pendingSource = source;
@@ -138,19 +141,22 @@ public final class MainActivity extends Activity {
     private void loadPreview(String imageUrl) {
         executor.execute(() -> {
             try {
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(imageUrl).openConnection();
-                connection.setConnectTimeout(10_000);
-                connection.setReadTimeout(10_000);
-                connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
-                android.graphics.Bitmap image;
-                try (java.io.InputStream stream = connection.getInputStream()) {
-                    image = BitmapFactory.decodeStream(stream);
-                } finally {
-                    connection.disconnect();
-                }
-                runOnUiThread(() -> previewImage.setImageBitmap(image));
+                Bitmap image = fetchBitmap(imageUrl, 10_000);
+                if (image != null) runOnUiThread(() -> previewImage.setImageBitmap(image));
             } catch (Exception ignored) { }
         });
+    }
+
+    private static Bitmap fetchBitmap(String imageUrl, int readTimeoutMs) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(imageUrl).openConnection();
+        connection.setConnectTimeout(10_000);
+        connection.setReadTimeout(readTimeoutMs);
+        connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
+        try (InputStream stream = connection.getInputStream()) {
+            return BitmapFactory.decodeStream(stream);
+        } finally {
+            connection.disconnect();
+        }
     }
 
     private void enqueueDownload(MediaResolver.MediaItem item) {
@@ -170,16 +176,7 @@ public final class MainActivity extends Activity {
         executor.execute(() -> {
             Uri destination = null;
             try {
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(item.downloadUrl).openConnection();
-                connection.setConnectTimeout(10_000);
-                connection.setReadTimeout(20_000);
-                connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
-                android.graphics.Bitmap image;
-                try (java.io.InputStream stream = connection.getInputStream()) {
-                    image = BitmapFactory.decodeStream(stream);
-                } finally {
-                    connection.disconnect();
-                }
+                Bitmap image = fetchBitmap(item.downloadUrl, 20_000);
                 if (image == null) throw new IllegalStateException("Il file ricevuto non è un'immagine valida.");
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                     throw new IllegalStateException("Il salvataggio JPEG richiede Android 10 o successivo.");
@@ -193,7 +190,7 @@ public final class MainActivity extends Activity {
                 destination = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
                 if (destination == null) throw new IllegalStateException("Impossibile creare il file JPEG.");
                 try (java.io.OutputStream output = getContentResolver().openOutputStream(destination)) {
-                    if (output == null || !image.compress(android.graphics.Bitmap.CompressFormat.JPEG, 100, output)) {
+                    if (output == null || !image.compress(Bitmap.CompressFormat.JPEG, 100, output)) {
                         throw new IllegalStateException("Impossibile convertire l'immagine in JPEG.");
                     }
                 }
@@ -251,16 +248,7 @@ public final class MainActivity extends Activity {
     private void loadHistoryPreview(View row, String imageUrl) {
         executor.execute(() -> {
             try {
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(imageUrl).openConnection();
-                connection.setConnectTimeout(10_000);
-                connection.setReadTimeout(10_000);
-                connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
-                android.graphics.Bitmap image;
-                try (java.io.InputStream stream = connection.getInputStream()) {
-                    image = BitmapFactory.decodeStream(stream);
-                } finally {
-                    connection.disconnect();
-                }
+                Bitmap image = fetchBitmap(imageUrl, 10_000);
                 if (image == null) return;
                 runOnUiThread(() -> {
                     ((ImageView) row.findViewById(R.id.itemPreview)).setImageBitmap(image);

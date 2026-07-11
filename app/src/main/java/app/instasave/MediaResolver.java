@@ -53,7 +53,7 @@ final class MediaResolver {
         }
     }
 
-    Result resolve(String sourceUrl, String requestedType) throws Exception {
+    Result resolve(String sourceUrl) throws Exception {
         if (isDirectMediaUrl(sourceUrl)) {
             String type = sourceUrl.toLowerCase(Locale.ROOT).contains(".mp4") ? "video" : "photo";
             String extension = type.equals("photo") ? ".jpg" : extensionFor(sourceUrl, ".mp4");
