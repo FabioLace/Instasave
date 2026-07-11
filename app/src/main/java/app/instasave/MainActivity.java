@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.graphics.BitmapFactory;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -21,7 +19,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import org.json.JSONArray;
@@ -36,7 +33,6 @@ public final class MainActivity extends Activity {
     private EditText urlInput;
     private Button analyzeButton;
     private TextView statusText;
-    private RadioGroup typeGroup;
     private LinearLayout historyContainer;
     private TextView emptyHistory;
     private LinearLayout previewContainer;
@@ -53,7 +49,6 @@ public final class MainActivity extends Activity {
         urlInput = findViewById(R.id.urlInput);
         analyzeButton = findViewById(R.id.analyzeButton);
         statusText = findViewById(R.id.statusText);
-        typeGroup = findViewById(R.id.typeGroup);
         historyContainer = findViewById(R.id.historyContainer);
         emptyHistory = findViewById(R.id.emptyHistory);
         previewContainer = findViewById(R.id.previewContainer);
@@ -62,7 +57,6 @@ public final class MainActivity extends Activity {
         previewMeta = findViewById(R.id.previewMeta);
         downloadButton = findViewById(R.id.downloadButton);
 
-        findViewById(R.id.pasteButton).setOnClickListener(v -> pasteLink());
         analyzeButton.setOnClickListener(v -> resolveAndDownload());
         downloadButton.setOnClickListener(v -> downloadPending());
         urlInput.addTextChangedListener(new TextWatcher() {
@@ -94,24 +88,13 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void pasteLink() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (clipboard.hasPrimaryClip()) {
-            ClipData clip = clipboard.getPrimaryClip();
-            if (clip != null && clip.getItemCount() > 0) {
-                urlInput.setText(extractUrl(String.valueOf(clip.getItemAt(0).coerceToText(this))));
-            }
-        }
-    }
-
     private void resolveAndDownload() {
         String source = urlInput.getText().toString().trim();
-        String type = selectedType();
         analyzeButton.setEnabled(false);
         showStatus("Analisi del contenuto in corso...", false);
         executor.execute(() -> {
             try {
-                MediaResolver.Result result = new MediaResolver().resolve(source, type);
+                MediaResolver.Result result = new MediaResolver().resolve(source, "auto");
                 runOnUiThread(() -> {
                     pendingResult = result;
                     pendingSource = source;
@@ -131,7 +114,7 @@ public final class MainActivity extends Activity {
     private void downloadPending() {
         if (pendingResult == null) return;
         for (MediaResolver.MediaItem item : pendingResult.items) enqueueDownload(item);
-        remember(pendingSource, pendingResult.type);
+        remember(pendingSource, pendingResult);
         renderHistory();
         downloadButton.setEnabled(false);
         downloadButton.setText("Download avviato");
@@ -230,19 +213,13 @@ public final class MainActivity extends Activity {
         return (dot > 0 ? filename.substring(0, dot) : filename) + ".jpg";
     }
 
-    private String selectedType() {
-        int id = typeGroup.getCheckedRadioButtonId();
-        if (id == R.id.typePhoto) return "photo";
-        if (id == R.id.typeVideo) return "video";
-        if (id == R.id.typeStory) return "story";
-        return "auto";
-    }
-
-    private void remember(String url, String type) {
+    private void remember(String url, MediaResolver.Result result) {
         try {
             JSONArray history = new JSONArray(getPreferences(MODE_PRIVATE).getString(HISTORY_KEY, "[]"));
             JSONArray next = new JSONArray();
-            JSONObject current = new JSONObject().put("url", url).put("type", type);
+            String preview = result.items.isEmpty() ? null : result.items.get(0).previewUrl;
+            JSONObject current = new JSONObject().put("url", url).put("type", result.type);
+            if (preview != null) current.put("preview", preview);
             next.put(current);
             for (int i = 0; i < history.length() && i < 4; i++) next.put(history.getJSONObject(i));
             getPreferences(MODE_PRIVATE).edit().putString(HISTORY_KEY, next.toString()).apply();
@@ -264,9 +241,34 @@ public final class MainActivity extends Activity {
         View row = LayoutInflater.from(this).inflate(R.layout.item_history, historyContainer, false);
         String type = item.optString("type", "auto");
         ((TextView) row.findViewById(R.id.itemIcon)).setText(type.equals("photo") ? "Foto" : type.equals("story") ? "Storia" : type.equals("carousel") ? "Multi" : "Video");
-        ((TextView) row.findViewById(R.id.itemTitle)).setText(extractUrl(item.getString("url")).replace("https://", ""));
-        ((TextView) row.findViewById(R.id.itemMeta)).setText(labelFor(type) + " · Appena aggiunto");
+        ((TextView) row.findViewById(R.id.itemTitle)).setText(type.equals("carousel") ? "Carosello Instagram" : "Contenuto Instagram");
+        ((TextView) row.findViewById(R.id.itemMeta)).setText(labelFor(type) + " · Scaricato ora");
         historyContainer.addView(row);
+        String preview = item.optString("preview", null);
+        if (preview != null && !preview.isEmpty()) loadHistoryPreview(row, preview);
+    }
+
+    private void loadHistoryPreview(View row, String imageUrl) {
+        executor.execute(() -> {
+            try {
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(imageUrl).openConnection();
+                connection.setConnectTimeout(10_000);
+                connection.setReadTimeout(10_000);
+                connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
+                android.graphics.Bitmap image;
+                try (java.io.InputStream stream = connection.getInputStream()) {
+                    image = BitmapFactory.decodeStream(stream);
+                } finally {
+                    connection.disconnect();
+                }
+                if (image == null) return;
+                runOnUiThread(() -> {
+                    ((ImageView) row.findViewById(R.id.itemPreview)).setImageBitmap(image);
+                    row.findViewById(R.id.itemPreview).setVisibility(View.VISIBLE);
+                    row.findViewById(R.id.itemIcon).setVisibility(View.GONE);
+                });
+            } catch (Exception ignored) { }
+        });
     }
 
     private void showStatus(String message, boolean isError) {
