@@ -22,6 +22,9 @@ final class MediaResolver {
     private static final Pattern JSON_SCRIPT = Pattern.compile(
             "<script[^>]+type=[\\\"']application/json[\\\"'][^>]*>(.*?)</script>",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern EMBED_CONTEXT_JSON = Pattern.compile(
+            "\\\"contextJSON\\\":\\\"((?:\\\\.|[^\\\"])*)\\\"",
+            Pattern.DOTALL);
     private static final Pattern EMBEDDED_MEDIA_IMAGE = Pattern.compile(
             "<img(?=[^>]*\\bclass=[\\\"'][^\\\"']*\\bEmbeddedMediaImage\\b[^\\\"']*[\\\"'])[^>]*>",
             Pattern.CASE_INSENSITIVE);
@@ -68,13 +71,27 @@ final class MediaResolver {
         String html = fetchHtml(sourceUrl);
 
         // Instagram embeds the page's own GraphQL response as inline JSON; when present it gives
-        // full-resolution URLs and carousel items, so it's tried before falling back to og: tags.
+        // full-resolution URLs. Keep it as a fallback: the public embed is more complete for
+        // carousel children.
         String shortcode = shortcodeFrom(sourceUrl);
         JSONObject mediaNode = findMediaNode(html, shortcode);
+        List<MediaItem> pageItems = null;
         if (mediaNode != null) {
-            List<MediaItem> items = mediaItemsFrom(mediaNode);
-            if (!items.isEmpty()) return new Result(items);
+            pageItems = mediaItemsFrom(mediaNode);
         }
+
+        // The public embed carries carousel children in its contextJSON. That JSON is itself
+        // stored as a string inside the embed bootstrap response, so it needs the extra pass in
+        // searchForMediaNode() below.
+        String embedHtml = publicEmbedHtml(sourceUrl, shortcode);
+        if (embedHtml != null) {
+            JSONObject embedMediaNode = findMediaNode(embedHtml, shortcode);
+            if (embedMediaNode != null) {
+                List<MediaItem> items = mediaItemsFrom(embedMediaNode);
+                if (!items.isEmpty()) return new Result(items);
+            }
+        }
+        if (pageItems != null && !pageItems.isEmpty()) return new Result(pageItems);
 
         String videoUrl = openGraphContent(html, "og:video:secure_url");
         if (videoUrl == null) videoUrl = openGraphContent(html, "og:video");
@@ -85,7 +102,7 @@ final class MediaResolver {
 
         // The permalink page exposes og:image only as a small, often cropped preview. Instagram's
         // public embed exposes the post image and its responsive sources, including the largest one.
-        String imageUrl = imageFromPublicEmbed(sourceUrl, shortcode);
+        String imageUrl = imageFromPublicEmbed(embedHtml);
         if (imageUrl == null) {
             throw new IllegalStateException("Instagram non ha esposto un media scaricabile per questo contenuto.");
         }
@@ -124,6 +141,16 @@ final class MediaResolver {
                 if (found != null) return found;
             } catch (Exception ignored) { }
         }
+        Matcher contextMatcher = EMBED_CONTEXT_JSON.matcher(html);
+        while (contextMatcher.find()) {
+            try {
+                String encodedValue = contextMatcher.group(1);
+                String contextJson = new JSONObject("{\"value\":\"" + encodedValue + "\"}")
+                        .getString("value");
+                JSONObject found = searchForMediaNode(new JSONObject(contextJson), expectedShortcode);
+                if (found != null) return found;
+            } catch (Exception ignored) { }
+        }
         return null;
     }
 
@@ -150,6 +177,12 @@ final class MediaResolver {
                 JSONObject found = searchForMediaNode(array.opt(i), expectedShortcode);
                 if (found != null) return found;
             }
+        } else if (node instanceof String) {
+            String value = (String) node;
+            if (!value.contains("shortcode_media")) return null;
+            try {
+                return searchForMediaNode(new JSONObject(value), expectedShortcode);
+            } catch (Exception ignored) { }
         }
         return null;
     }
@@ -182,20 +215,24 @@ final class MediaResolver {
         items.add(new MediaItem(url, filename, type, displayUrl));
     }
 
-    private static String imageFromPublicEmbed(String sourceUrl, String shortcode) {
+    private static String publicEmbedHtml(String sourceUrl, String shortcode) {
         try {
             String embedUrl = sourceUrl.replaceFirst("[?#].*$", "");
             if (!embedUrl.endsWith("/")) embedUrl += "/";
             String html = fetchHtml(embedUrl + "embed/");
-            if (shortcode == null || !html.contains(shortcode) || isInstagramErrorPage(html)) return null;
-            Matcher imageMatch = EMBEDDED_MEDIA_IMAGE.matcher(html);
-            if (!imageMatch.find()) return null;
-            String tag = imageMatch.group();
-            String best = bestFromSrcSet(attribute(tag, "srcset"));
-            return best != null ? best : attribute(tag, "src");
+            return shortcode == null || !html.contains(shortcode) || isInstagramErrorPage(html) ? null : html;
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static String imageFromPublicEmbed(String html) {
+        if (html == null) return null;
+        Matcher imageMatch = EMBEDDED_MEDIA_IMAGE.matcher(html);
+        if (!imageMatch.find()) return null;
+        String tag = imageMatch.group();
+        String best = bestFromSrcSet(attribute(tag, "srcset"));
+        return best != null ? best : attribute(tag, "src");
     }
 
     private static String attribute(String tag, String name) {
