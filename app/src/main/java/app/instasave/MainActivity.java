@@ -16,7 +16,10 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -27,6 +30,8 @@ import org.json.JSONObject;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -43,6 +48,11 @@ public final class MainActivity extends Activity {
     private TextView previewTitle;
     private TextView previewMeta;
     private Button downloadButton;
+    private TextView selectionLabel;
+    private LinearLayout carouselSelectionContainer;
+    // Checkbox create dinamicamente, uno per elemento del carosello mostrato.
+    private final List<CheckBox> carouselSelections = new ArrayList<>();
+    // Risultato dell'ultima analisi: rimane in memoria fino al download o a un nuovo link.
     private MediaResolver.Result pendingResult;
     private String pendingSource;
 
@@ -59,6 +69,8 @@ public final class MainActivity extends Activity {
         previewTitle = findViewById(R.id.previewTitle);
         previewMeta = findViewById(R.id.previewMeta);
         downloadButton = findViewById(R.id.downloadButton);
+        selectionLabel = findViewById(R.id.selectionLabel);
+        carouselSelectionContainer = findViewById(R.id.carouselSelectionContainer);
 
         analyzeButton.setOnClickListener(v -> resolveAndDownload());
         downloadButton.setOnClickListener(v -> downloadPending());
@@ -67,6 +79,8 @@ public final class MainActivity extends Activity {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 analyzeButton.setEnabled(isValidUrl(s.toString()));
                 previewContainer.setVisibility(View.GONE);
+                pendingResult = null;
+                carouselSelections.clear();
             }
             @Override public void afterTextChanged(Editable s) { }
         });
@@ -95,6 +109,7 @@ public final class MainActivity extends Activity {
         String source = urlInput.getText().toString().trim();
         analyzeButton.setEnabled(false);
         showStatus("Analisi del contenuto in corso...", false);
+        // La richiesta di rete resta fuori dal thread grafico per non bloccare l'interfaccia.
         executor.execute(() -> {
             try {
                 MediaResolver.Result result = new MediaResolver().resolve(source);
@@ -107,7 +122,7 @@ public final class MainActivity extends Activity {
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
-                    showStatus(error.getMessage(), true);
+                    showStatus(errorMessage(error), true);
                     analyzeButton.setEnabled(true);
                 });
             }
@@ -116,13 +131,19 @@ public final class MainActivity extends Activity {
 
     private void downloadPending() {
         if (pendingResult == null) return;
-        for (MediaResolver.MediaItem item : pendingResult.items) enqueueDownload(item);
+        // Per un post singolo l'unico elemento è sempre selezionato; per un carousel si usano le checkbox.
+        List<MediaResolver.MediaItem> selected = selectedItems();
+        if (selected.isEmpty()) {
+            showStatus("Seleziona almeno un elemento da scaricare.", true);
+            return;
+        }
+        for (MediaResolver.MediaItem item : selected) enqueueDownload(item);
         remember(pendingSource, pendingResult);
         renderHistory();
         downloadButton.setEnabled(false);
         downloadButton.setText("Download avviato");
-        boolean isCarousel = pendingResult.items.size() > 1;
-        showStatus(isCarousel ? "Download avviati. Li trovi nelle notifiche." : "Download avviato. Lo trovi nelle notifiche.", false);
+        showStatus(selected.size() > 1 ? "Download avviati. Li trovi nelle notifiche."
+                : "Download avviato. Lo trovi nelle notifiche.", false);
     }
 
     private void showPreview(MediaResolver.Result result) {
@@ -132,10 +153,86 @@ public final class MainActivity extends Activity {
                 : result.type.equals("video") ? "Anteprima dal post pubblico" : "Immagine dal post pubblico");
         previewImage.setImageDrawable(null);
         downloadButton.setEnabled(true);
-        downloadButton.setText(isCarousel ? "Scarica tutto" : "Scarica");
+        downloadButton.setText(isCarousel ? "Scarica selezionati" : "Scarica");
+        renderCarouselSelections(result); // Aggiunge le opzioni solo quando ci sono più elementi.
         previewContainer.setVisibility(View.VISIBLE);
         String previewUrl = result.items.get(0).previewUrl;
         if (previewUrl != null) loadPreview(previewUrl);
+    }
+
+    private void renderCarouselSelections(MediaResolver.Result result) {
+        carouselSelections.clear();
+        carouselSelectionContainer.removeAllViews();
+        boolean isCarousel = result.items.size() > 1;
+        selectionLabel.setVisibility(isCarousel ? View.VISIBLE : View.GONE);
+        carouselSelectionContainer.setVisibility(isCarousel ? View.VISIBLE : View.GONE);
+        if (!isCarousel) return;
+
+        // Tre colonne di miniature quadrate, come la griglia della bacheca Instagram.
+        GridLayout grid = new GridLayout(this);
+        grid.setColumnCount(3);
+        grid.setUseDefaultMargins(false);
+        carouselSelectionContainer.addView(grid, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        int gap = dp(6);
+        int cellSize = (getResources().getDisplayMetrics().widthPixels - dp(72) - gap * 2) / 3;
+
+        // Le celle sono create qui perché il loro numero dipende dal carousel analizzato.
+        for (int i = 0; i < result.items.size(); i++) {
+            MediaResolver.MediaItem item = result.items.get(i);
+            FrameLayout cell = new FrameLayout(this);
+            cell.setBackgroundResource(R.drawable.bg_history_icon);
+            ImageView thumbnail = new ImageView(this);
+            thumbnail.setContentDescription("Anteprima elemento " + (i + 1));
+            thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            cell.addView(thumbnail, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            CheckBox choice = new CheckBox(this);
+            choice.setChecked(true);
+            choice.setContentDescription("Seleziona elemento " + (i + 1) + " · "
+                    + ("video".equals(item.type) ? "Video" : "Foto"));
+            // Icona personalizzata: fondo viola e spunta bianca per la selezione attiva.
+            choice.setButtonDrawable(R.drawable.carousel_checkbox);
+            FrameLayout.LayoutParams checkParams = new FrameLayout.LayoutParams(dp(42), dp(42),
+                    android.view.Gravity.END | android.view.Gravity.BOTTOM);
+            choice.setPadding(0, 0, 0, 0);
+            choice.setOnCheckedChangeListener((button, checked) -> updateDownloadButton());
+            carouselSelections.add(choice);
+            cell.addView(choice, checkParams);
+            cell.setOnClickListener(v -> choice.setChecked(!choice.isChecked()));
+            GridLayout.LayoutParams cellParams = new GridLayout.LayoutParams();
+            cellParams.width = cellSize;
+            cellParams.height = cellSize;
+            cellParams.setMargins(i % 3 == 0 ? 0 : gap, 0, 0, gap);
+            grid.addView(cell, cellParams);
+            if (item.previewUrl != null) loadCarouselThumbnail(thumbnail, item.previewUrl);
+        }
+    }
+
+    private List<MediaResolver.MediaItem> selectedItems() {
+        List<MediaResolver.MediaItem> selected = new ArrayList<>();
+        if (pendingResult == null) return selected;
+        if (pendingResult.items.size() == 1) {
+            selected.add(pendingResult.items.get(0));
+            return selected;
+        }
+        // L'ordine delle checkbox corrisponde all'ordine dei media restituiti dal resolver.
+        for (int i = 0; i < pendingResult.items.size() && i < carouselSelections.size(); i++) {
+            if (carouselSelections.get(i).isChecked()) selected.add(pendingResult.items.get(i));
+        }
+        return selected;
+    }
+
+    private void updateDownloadButton() {
+        // Mantiene testo e stato del pulsante coerenti con le selezioni dell'utente.
+        int count = 0;
+        for (CheckBox choice : carouselSelections) if (choice.isChecked()) count++;
+        downloadButton.setEnabled(count > 0);
+        downloadButton.setText(count == 0 ? "Seleziona elementi" : "Scarica " + count + " selezionati");
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void loadPreview(String imageUrl) {
@@ -143,6 +240,16 @@ public final class MainActivity extends Activity {
             try {
                 Bitmap image = fetchBitmap(imageUrl, 10_000);
                 if (image != null) runOnUiThread(() -> previewImage.setImageBitmap(image));
+            } catch (Exception ignored) { }
+        });
+    }
+
+    private void loadCarouselThumbnail(ImageView target, String imageUrl) {
+        // Le miniature sono facoltative: se una non è disponibile, la checkbox resta comunque usabile.
+        executor.execute(() -> {
+            try {
+                Bitmap image = fetchBitmap(imageUrl, 10_000);
+                if (image != null) runOnUiThread(() -> target.setImageBitmap(image));
             } catch (Exception ignored) { }
         });
     }
@@ -200,7 +307,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> showStatus("Foto JPEG salvata in Download/Instasave.", false));
             } catch (Exception error) {
                 if (destination != null) getContentResolver().delete(destination, null, null);
-                runOnUiThread(() -> showStatus(error.getMessage(), true));
+                runOnUiThread(() -> showStatus(errorMessage(error), true));
             }
         });
     }
@@ -263,6 +370,12 @@ public final class MainActivity extends Activity {
         statusText.setText(message);
         statusText.setTextColor(getColor(isError ? R.color.accent_dark : R.color.muted));
         statusText.setVisibility(View.VISIBLE);
+    }
+
+    private static String errorMessage(Exception error) {
+        String message = error.getMessage();
+        return message == null || message.trim().isEmpty()
+                ? "Non è stato possibile elaborare questo contenuto pubblico." : message;
     }
 
     private static boolean isValidUrl(String raw) {

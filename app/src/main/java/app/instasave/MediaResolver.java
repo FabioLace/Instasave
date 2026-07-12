@@ -22,6 +22,8 @@ final class MediaResolver {
     private static final Pattern JSON_SCRIPT = Pattern.compile(
             "<script[^>]+type=[\\\"']application/json[\\\"'][^>]*>(.*?)</script>",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern SCRIPT = Pattern.compile(
+            "<script[^>]*>(.*?)</script>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern EMBED_CONTEXT_JSON = Pattern.compile(
             "\\\"contextJSON\\\":\\\"((?:\\\\.|[^\\\"])*)\\\"",
             Pattern.DOTALL);
@@ -132,14 +134,22 @@ final class MediaResolver {
     }
 
     private static JSONObject findMediaNode(String html, String expectedShortcode) {
+        // Primo tentativo: script JSON dichiarati esplicitamente nella pagina.
         Matcher matcher = JSON_SCRIPT.matcher(html);
         while (matcher.find()) {
-            String content = matcher.group(1);
-            if (!content.contains("shortcode_media")) continue;
-            try {
-                JSONObject found = searchForMediaNode(new JSONObject(content), expectedShortcode);
-                if (found != null) return found;
-            } catch (Exception ignored) { }
+            JSONObject found = mediaNodeFromJson(matcher.group(1), expectedShortcode);
+            if (found != null) return found;
+        }
+        // Depending on the web response, Instagram can place the same bootstrap JSON in a
+        // regular JavaScript tag instead of type="application/json". In particular this is
+        // common for carousel posts, so inspect those tags as well.
+        Matcher scriptMatcher = SCRIPT.matcher(html);
+        while (scriptMatcher.find()) {
+            String content = scriptMatcher.group(1);
+            if (!content.contains("shortcode_media") && !content.contains("edge_sidecar_to_children")
+                    && !content.contains("carousel_media")) continue;
+            JSONObject found = mediaNodeFromJson(firstJsonObject(content), expectedShortcode);
+            if (found != null) return found;
         }
         Matcher contextMatcher = EMBED_CONTEXT_JSON.matcher(html);
         while (contextMatcher.find()) {
@@ -154,12 +164,45 @@ final class MediaResolver {
         return null;
     }
 
+    private static JSONObject mediaNodeFromJson(String json, String expectedShortcode) {
+        if (json == null) return null;
+        try {
+            return searchForMediaNode(new JSONObject(json), expectedShortcode);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /** Returns the first complete JSON object embedded in a JavaScript expression. */
+    private static String firstJsonObject(String source) {
+        if (source == null) return null;
+        int start = source.indexOf('{');
+        if (start < 0) return null;
+        boolean quoted = false;
+        boolean escaped = false;
+        int depth = 0;
+        for (int i = start; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (c == '\\') escaped = true;
+                else if (c == '"') quoted = false;
+                continue;
+            }
+            if (c == '"') quoted = true;
+            else if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) return source.substring(start, i + 1);
+        }
+        return null;
+    }
+
     // Field names below (xdt_shortcode_media / shortcode_media) come from Instagram's own internal
     // GraphQL response, embedded for client-side rendering. Unofficial and undocumented, so any
     // resolve() call that doesn't find this shape falls back to og: tags instead of failing outright.
     private static JSONObject searchForMediaNode(Object node, String expectedShortcode) {
         if (node instanceof JSONObject) {
             JSONObject obj = (JSONObject) node;
+            if (matchesShortcode(obj, expectedShortcode) && isMediaObject(obj)) return obj;
             Object direct = obj.opt("xdt_shortcode_media");
             if (direct == null) direct = obj.opt("shortcode_media");
             if (direct instanceof JSONObject) {
@@ -189,12 +232,19 @@ final class MediaResolver {
 
     private static List<MediaItem> mediaItemsFrom(JSONObject mediaNode) {
         List<MediaItem> items = new ArrayList<>();
+        // Instagram usa sia il formato GraphQL "edges" sia il vecchio array "carousel_media".
         JSONObject sidecar = mediaNode.optJSONObject("edge_sidecar_to_children");
         JSONArray edges = sidecar != null ? sidecar.optJSONArray("edges") : null;
         if (edges != null) {
             for (int i = 0; i < edges.length(); i++) {
                 JSONObject child = edges.optJSONObject(i);
                 JSONObject childNode = child != null ? child.optJSONObject("node") : null;
+                if (childNode != null) addMediaItem(items, childNode, i);
+            }
+        } else if (mediaNode.optJSONArray("carousel_media") != null) {
+            JSONArray children = mediaNode.optJSONArray("carousel_media");
+            for (int i = 0; i < children.length(); i++) {
+                JSONObject childNode = children.optJSONObject(i);
                 if (childNode != null) addMediaItem(items, childNode, i);
             }
         } else {
@@ -207,6 +257,14 @@ final class MediaResolver {
         boolean isVideo = node.optBoolean("is_video", false);
         String displayUrl = bestImageUrl(node);
         String videoUrl = nonEmpty(node.optString("video_url", null));
+        if (videoUrl == null) {
+            // Nei payload meno recenti le URL video sono raccolte in una lista di versioni.
+            JSONArray versions = node.optJSONArray("video_versions");
+            if (versions != null && versions.length() > 0) {
+                JSONObject version = versions.optJSONObject(0);
+                if (version != null) videoUrl = nonEmpty(version.optString("url", null));
+            }
+        }
         String url = isVideo && videoUrl != null ? videoUrl : displayUrl;
         if (url == null) return;
         String type = isVideo && videoUrl != null ? "video" : "photo";
@@ -264,12 +322,19 @@ final class MediaResolver {
         return expectedShortcode.equals(shortcode);
     }
 
+    private static boolean isMediaObject(JSONObject object) {
+        return object.has("edge_sidecar_to_children") || object.has("carousel_media")
+                || object.has("display_url") || object.has("image_versions2")
+                || object.has("video_url") || object.has("video_versions");
+    }
+
     /**
      * Instagram can expose several resized versions. Pick the largest declared one rather than
      * blindly using the first thumbnail returned by the page data.
      */
     private static String bestImageUrl(JSONObject node) {
         String bestUrl = nonEmpty(node.optString("display_url", null));
+        if (bestUrl == null) bestUrl = nonEmpty(node.optString("thumbnail_src", null));
         long bestArea = 0;
         JSONArray displayResources = node.optJSONArray("display_resources");
         ImageCandidate displayCandidate = bestCandidate(displayResources, "src", "config_width", "config_height");
