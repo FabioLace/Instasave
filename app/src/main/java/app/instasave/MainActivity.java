@@ -45,6 +45,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private EditText urlInput;
     private ImageButton pasteButton;
+    private ImageButton clearUrlButton;
     private Button analyzeButton;
     private TextView statusText;
     private LinearLayout historyContainer;
@@ -70,6 +71,7 @@ public final class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         urlInput = findViewById(R.id.urlInput);
         pasteButton = findViewById(R.id.pasteButton);
+        clearUrlButton = findViewById(R.id.clearUrlButton);
         analyzeButton = findViewById(R.id.analyzeButton);
         statusText = findViewById(R.id.statusText);
         historyContainer = findViewById(R.id.historyContainer);
@@ -88,12 +90,17 @@ public final class MainActivity extends Activity {
         analyzeButton.setOnClickListener(v -> resolveAndDownload());
         downloadButton.setOnClickListener(v -> downloadPending());
         pasteButton.setOnClickListener(v -> pasteLink());
+        clearUrlButton.setOnClickListener(v -> {
+            urlInput.setText("");
+            clearStatus();
+        });
         historyHeader.setOnClickListener(v -> setHistoryExpanded(!isHistoryExpanded()));
         clearHistoryButton.setOnClickListener(v -> confirmClearHistory());
         urlInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 analyzeButton.setEnabled(isValidUrl(s.toString()));
+                clearUrlButton.setVisibility(s.length() > 0 ? View.VISIBLE : View.GONE);
                 previewContainer.setVisibility(View.GONE);
                 pendingResult = null;
                 carouselSelections.clear();
@@ -490,6 +497,7 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (isFinishing()) urlInput.setText("");
         executor.shutdownNow();
         super.onDestroy();
     }
