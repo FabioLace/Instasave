@@ -27,10 +27,12 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.util.LruCache;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -42,7 +44,12 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends Activity {
     private static final String HISTORY_KEY = "history";
     private static final String HISTORY_EXPANDED_KEY = "history_expanded";
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    // Keep user-facing analysis independent from optional image loading and file conversion.
+    // A slow history thumbnail must never delay a newly submitted link.
+    private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
+    private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor();
+    private final LruCache<String, Bitmap> bitmapCache = createBitmapCache();
     private EditText urlInput;
     private ImageButton pasteButton;
     private ImageButton clearUrlButton;
@@ -102,6 +109,9 @@ public final class MainActivity extends Activity {
                 analyzeButton.setEnabled(isValidUrl(s.toString()));
                 clearUrlButton.setVisibility(s.length() > 0 ? View.VISIBLE : View.GONE);
                 previewContainer.setVisibility(View.GONE);
+                previewImage.setTag(null);
+                previewImage.setImageDrawable(null);
+                carouselSelectionContainer.removeAllViews();
                 pendingResult = null;
                 carouselSelections.clear();
             }
@@ -155,10 +165,11 @@ public final class MainActivity extends Activity {
         analyzeButton.setEnabled(false);
         showStatus("Analyzing content...", false);
         // Keep the network request off the UI thread to avoid blocking the interface.
-        executor.execute(() -> {
+        resolverExecutor.execute(() -> {
             try {
                 MediaResolver.Result result = new MediaResolver().resolve(source);
                 runOnUiThread(() -> {
+                    if (!source.equals(urlInput.getText().toString().trim())) return;
                     pendingResult = result;
                     pendingSource = source;
                     showPreview(result);
@@ -250,7 +261,7 @@ public final class MainActivity extends Activity {
             cellParams.height = cellSize;
             cellParams.setMargins(i % 3 == 0 ? 0 : gap, 0, 0, gap);
             grid.addView(cell, cellParams);
-            if (item.previewUrl != null) loadCarouselThumbnail(thumbnail, item.previewUrl);
+            if (item.previewUrl != null) loadCarouselThumbnail(thumbnail, item.previewUrl, cellSize);
         }
     }
 
@@ -281,25 +292,77 @@ public final class MainActivity extends Activity {
     }
 
     private void loadPreview(String imageUrl) {
-        executor.execute(() -> {
+        previewImage.setTag(imageUrl);
+        imageExecutor.execute(() -> {
             try {
-                Bitmap image = fetchBitmap(imageUrl, 10_000);
-                if (image != null) runOnUiThread(() -> previewImage.setImageBitmap(image));
+                Bitmap image = fetchPreviewBitmap(imageUrl, 10_000, dp(88), dp(88));
+                if (image != null) runOnUiThread(() -> {
+                    if (imageUrl.equals(previewImage.getTag())) previewImage.setImageBitmap(image);
+                });
             } catch (Exception ignored) { }
         });
     }
 
-    private void loadCarouselThumbnail(ImageView target, String imageUrl) {
+    private void loadCarouselThumbnail(ImageView target, String imageUrl, int targetSize) {
         // Thumbnails are optional: the checkbox remains usable if one is unavailable.
-        executor.execute(() -> {
+        target.setTag(imageUrl);
+        imageExecutor.execute(() -> {
             try {
-                Bitmap image = fetchBitmap(imageUrl, 10_000);
-                if (image != null) runOnUiThread(() -> target.setImageBitmap(image));
+                Bitmap image = fetchPreviewBitmap(imageUrl, 10_000, targetSize, targetSize);
+                if (image != null) runOnUiThread(() -> {
+                    if (imageUrl.equals(target.getTag())) target.setImageBitmap(image);
+                });
             } catch (Exception ignored) { }
         });
     }
 
-    private static Bitmap fetchBitmap(String imageUrl, int readTimeoutMs) throws Exception {
+    private Bitmap fetchPreviewBitmap(String imageUrl, int readTimeoutMs,
+                                      int requestedWidth, int requestedHeight) throws Exception {
+        synchronized (bitmapCache) {
+            Bitmap cached = bitmapCache.get(imageUrl);
+            if (cached != null && cached.getWidth() >= requestedWidth
+                    && cached.getHeight() >= requestedHeight) return cached;
+        }
+
+        byte[] encoded = fetchImageBytes(imageUrl, readTimeoutMs);
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(encoded, 0, encoded.length, bounds);
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight,
+                requestedWidth, requestedHeight);
+        Bitmap image = BitmapFactory.decodeByteArray(encoded, 0, encoded.length, options);
+        if (image != null) {
+            synchronized (bitmapCache) {
+                Bitmap cached = bitmapCache.get(imageUrl);
+                if (cached == null || image.getByteCount() > cached.getByteCount()) {
+                    bitmapCache.put(imageUrl, image);
+                } else {
+                    image = cached;
+                }
+            }
+        }
+        return image;
+    }
+
+    private static byte[] fetchImageBytes(String imageUrl, int readTimeoutMs) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(imageUrl).openConnection();
+        connection.setConnectTimeout(10_000);
+        connection.setReadTimeout(readTimeoutMs);
+        connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
+        try (InputStream stream = connection.getInputStream();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[16 * 1024];
+            int count;
+            while ((count = stream.read(buffer)) != -1) output.write(buffer, 0, count);
+            return output.toByteArray();
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static Bitmap fetchOriginalBitmap(String imageUrl, int readTimeoutMs) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(imageUrl).openConnection();
         connection.setConnectTimeout(10_000);
         connection.setReadTimeout(readTimeoutMs);
@@ -309,6 +372,23 @@ public final class MainActivity extends Activity {
         } finally {
             connection.disconnect();
         }
+    }
+
+    private static int sampleSize(int width, int height, int requestedWidth, int requestedHeight) {
+        int sample = 1;
+        while (width / (sample * 2) >= requestedWidth
+                && height / (sample * 2) >= requestedHeight) sample *= 2;
+        return sample;
+    }
+
+    private static LruCache<String, Bitmap> createBitmapCache() {
+        int maxMemoryKb = (int) (Runtime.getRuntime().maxMemory() / 1024L);
+        int cacheSizeKb = Math.min(16 * 1024, maxMemoryKb / 8);
+        return new LruCache<String, Bitmap>(cacheSizeKb) {
+            @Override protected int sizeOf(String key, Bitmap bitmap) {
+                return Math.max(1, bitmap.getByteCount() / 1024);
+            }
+        };
     }
 
     private void enqueueDownload(MediaResolver.MediaItem item) {
@@ -325,10 +405,10 @@ public final class MainActivity extends Activity {
     }
 
     private void savePhotoAsJpeg(MediaResolver.MediaItem item) {
-        executor.execute(() -> {
+        saveExecutor.execute(() -> {
             Uri destination = null;
             try {
-                Bitmap image = fetchBitmap(item.downloadUrl, 20_000);
+                Bitmap image = fetchOriginalBitmap(item.downloadUrl, 20_000);
                 if (image == null) throw new IllegalStateException("The received file is not a valid image.");
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                     throw new IllegalStateException("Saving as JPEG requires Android 10 or later.");
@@ -387,7 +467,9 @@ public final class MainActivity extends Activity {
             historyContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
             emptyHistory.setVisibility(expanded && history.length() == 0 ? View.VISIBLE : View.GONE);
             clearHistoryButton.setVisibility(expanded && history.length() > 0 ? View.VISIBLE : View.GONE);
-            for (int i = 0; i < history.length(); i++) addHistoryItem(history.getJSONObject(i), i);
+            if (expanded) {
+                for (int i = 0; i < history.length(); i++) addHistoryItem(history.getJSONObject(i), i);
+            }
         } catch (Exception ignored) {
             emptyHistory.setVisibility(View.VISIBLE);
             clearHistoryButton.setVisibility(View.GONE);
@@ -445,13 +527,16 @@ public final class MainActivity extends Activity {
     }
 
     private void loadHistoryPreview(View row, String imageUrl) {
-        executor.execute(() -> {
+        ImageView target = row.findViewById(R.id.itemPreview);
+        target.setTag(imageUrl);
+        imageExecutor.execute(() -> {
             try {
-                Bitmap image = fetchBitmap(imageUrl, 10_000);
+                Bitmap image = fetchPreviewBitmap(imageUrl, 10_000, dp(42), dp(42));
                 if (image == null) return;
                 runOnUiThread(() -> {
-                    ((ImageView) row.findViewById(R.id.itemPreview)).setImageBitmap(image);
-                    row.findViewById(R.id.itemPreview).setVisibility(View.VISIBLE);
+                    if (!imageUrl.equals(target.getTag())) return;
+                    target.setImageBitmap(image);
+                    target.setVisibility(View.VISIBLE);
                     row.findViewById(R.id.itemIcon).setVisibility(View.GONE);
                 });
             } catch (Exception ignored) { }
@@ -498,7 +583,9 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         if (isFinishing()) urlInput.setText("");
-        executor.shutdownNow();
+        resolverExecutor.shutdownNow();
+        imageExecutor.shutdownNow();
+        saveExecutor.shutdownNow();
         super.onDestroy();
     }
 }

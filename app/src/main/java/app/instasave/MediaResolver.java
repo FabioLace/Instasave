@@ -14,6 +14,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -70,12 +74,24 @@ final class MediaResolver {
             throw new IllegalArgumentException("Paste a public Instagram permalink or a direct media URL.");
         }
 
-        String html = fetchHtml(sourceUrl);
-
         // Instagram embeds the page's own GraphQL response as inline JSON; when present it gives
         // full-resolution URLs. Keep it as a fallback: the public embed is more complete for
         // carousel children.
         String shortcode = shortcodeFrom(sourceUrl);
+        // Both documents are needed for the complete fallback chain. Fetch them concurrently so
+        // their network latency is not paid back-to-back on every analysis.
+        String html;
+        String embedHtml;
+        ExecutorService requests = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> pageRequest = requests.submit(() -> fetchHtml(sourceUrl));
+            Future<String> embedRequest = requests.submit(() -> publicEmbedHtml(sourceUrl, shortcode));
+            html = getPage(pageRequest);
+            embedHtml = getPage(embedRequest);
+        } finally {
+            requests.shutdownNow();
+        }
+
         JSONObject mediaNode = findMediaNode(html, shortcode);
         List<MediaItem> pageItems = null;
         if (mediaNode != null) {
@@ -85,7 +101,6 @@ final class MediaResolver {
         // The public embed carries carousel children in its contextJSON. That JSON is itself
         // stored as a string inside the embed bootstrap response, so it needs the extra pass in
         // searchForMediaNode() below.
-        String embedHtml = publicEmbedHtml(sourceUrl, shortcode);
         if (embedHtml != null) {
             JSONObject embedMediaNode = findMediaNode(embedHtml, shortcode);
             if (embedMediaNode != null) {
@@ -110,6 +125,16 @@ final class MediaResolver {
         }
         String filename = "instasave_" + System.currentTimeMillis() + ".jpg";
         return new Result(Collections.singletonList(new MediaItem(imageUrl, filename, "photo", imageUrl)));
+    }
+
+    private static String getPage(Future<String> request) throws Exception {
+        try {
+            return request.get();
+        } catch (ExecutionException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            throw new IllegalStateException("Unable to read this public content.", cause);
+        }
     }
 
     private static String fetchHtml(String url) throws Exception {

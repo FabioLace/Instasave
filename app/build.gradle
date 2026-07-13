@@ -16,4 +16,10 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    // The high-resolution branding source is kept in the repository, but is not a runtime asset.
+    // There are currently no assets required by the application at runtime.
+    sourceSets {
+        main.assets.srcDirs = []
+    }
 }

@@ -86,7 +86,9 @@ app/src/main/
     logo.png                # High-resolution source logo
 ```
 
-`assets/branding/logo.png` is the source logo file. The copies in `res/mipmap-*` are resized versions used by Android for the launcher icon and the logo shown in the app header.
+`assets/branding/logo.png` is the high-resolution source logo file. It is excluded from APK
+packaging; the optimized copies in `res/mipmap-*` are used by Android for the launcher icon and
+the logo shown in the app header.
 
 ## Usage Note
 
