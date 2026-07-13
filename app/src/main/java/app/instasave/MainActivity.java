@@ -1,7 +1,10 @@
 package app.instasave;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -20,6 +23,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -37,12 +41,17 @@ import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
     private static final String HISTORY_KEY = "history";
+    private static final String HISTORY_EXPANDED_KEY = "history_expanded";
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private EditText urlInput;
+    private ImageButton pasteButton;
     private Button analyzeButton;
     private TextView statusText;
     private LinearLayout historyContainer;
     private TextView emptyHistory;
+    private View historyHeader;
+    private TextView historyToggle;
+    private TextView clearHistoryButton;
     private LinearLayout previewContainer;
     private ImageView previewImage;
     private TextView previewTitle;
@@ -50,9 +59,9 @@ public final class MainActivity extends Activity {
     private Button downloadButton;
     private TextView selectionLabel;
     private LinearLayout carouselSelectionContainer;
-    // Checkbox create dinamicamente, uno per elemento del carosello mostrato.
+    // Checkboxes are created dynamically, one for each displayed carousel item.
     private final List<CheckBox> carouselSelections = new ArrayList<>();
-    // Risultato dell'ultima analisi: rimane in memoria fino al download o a un nuovo link.
+    // The latest analysis result stays in memory until download or a new link.
     private MediaResolver.Result pendingResult;
     private String pendingSource;
 
@@ -60,10 +69,14 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
         urlInput = findViewById(R.id.urlInput);
+        pasteButton = findViewById(R.id.pasteButton);
         analyzeButton = findViewById(R.id.analyzeButton);
         statusText = findViewById(R.id.statusText);
         historyContainer = findViewById(R.id.historyContainer);
         emptyHistory = findViewById(R.id.emptyHistory);
+        historyHeader = findViewById(R.id.historyHeader);
+        historyToggle = findViewById(R.id.historyToggle);
+        clearHistoryButton = findViewById(R.id.clearHistoryButton);
         previewContainer = findViewById(R.id.previewContainer);
         previewImage = findViewById(R.id.previewImage);
         previewTitle = findViewById(R.id.previewTitle);
@@ -74,6 +87,9 @@ public final class MainActivity extends Activity {
 
         analyzeButton.setOnClickListener(v -> resolveAndDownload());
         downloadButton.setOnClickListener(v -> downloadPending());
+        pasteButton.setOnClickListener(v -> pasteLink());
+        historyHeader.setOnClickListener(v -> setHistoryExpanded(!isHistoryExpanded()));
+        clearHistoryButton.setOnClickListener(v -> confirmClearHistory());
         urlInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -100,16 +116,38 @@ public final class MainActivity extends Activity {
             if (shared != null) {
                 urlInput.setText(extractUrl(shared));
                 urlInput.setSelection(urlInput.length());
-                showStatus("Link ricevuto da Instagram. Pronto per l'analisi.", false);
+                showStatus("Instagram link received. Ready to analyze.", false);
             }
         }
+    }
+
+    private void pasteLink() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+            showStatus("Clipboard is empty.", true);
+            return;
+        }
+        ClipData clip = clipboard.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) {
+            showStatus("Clipboard is empty.", true);
+            return;
+        }
+        CharSequence content = clip.getItemAt(0).coerceToText(this);
+        String link = content == null ? "" : extractUrl(content.toString());
+        if (!isValidUrl(link)) {
+            showStatus("Clipboard doesn't contain a valid link.", true);
+            return;
+        }
+        urlInput.setText(link);
+        urlInput.setSelection(urlInput.length());
+        showStatus("Link pasted. Ready to analyze.", false);
     }
 
     private void resolveAndDownload() {
         String source = urlInput.getText().toString().trim();
         analyzeButton.setEnabled(false);
-        showStatus("Analisi del contenuto in corso...", false);
-        // La richiesta di rete resta fuori dal thread grafico per non bloccare l'interfaccia.
+        showStatus("Analyzing content...", false);
+        // Keep the network request off the UI thread to avoid blocking the interface.
         executor.execute(() -> {
             try {
                 MediaResolver.Result result = new MediaResolver().resolve(source);
@@ -117,7 +155,7 @@ public final class MainActivity extends Activity {
                     pendingResult = result;
                     pendingSource = source;
                     showPreview(result);
-                    showStatus("Contenuto pronto per il download.", false);
+                    showStatus("Content ready to download.", false);
                     analyzeButton.setEnabled(true);
                 });
             } catch (Exception error) {
@@ -131,30 +169,30 @@ public final class MainActivity extends Activity {
 
     private void downloadPending() {
         if (pendingResult == null) return;
-        // Per un post singolo l'unico elemento è sempre selezionato; per un carousel si usano le checkbox.
+        // A single post always selects its only item; carousels use the checkboxes.
         List<MediaResolver.MediaItem> selected = selectedItems();
         if (selected.isEmpty()) {
-            showStatus("Seleziona almeno un elemento da scaricare.", true);
+            showStatus("Select at least one item to download.", true);
             return;
         }
         for (MediaResolver.MediaItem item : selected) enqueueDownload(item);
         remember(pendingSource, pendingResult);
         renderHistory();
         downloadButton.setEnabled(false);
-        downloadButton.setText("Download avviato");
-        showStatus(selected.size() > 1 ? "Download avviati. Li trovi nelle notifiche."
-                : "Download avviato. Lo trovi nelle notifiche.", false);
+        downloadButton.setText("Download started");
+        showStatus(selected.size() > 1 ? "Downloads started. Find them in notifications."
+                : "Download started. Find it in notifications.", false);
     }
 
     private void showPreview(MediaResolver.Result result) {
         boolean isCarousel = result.items.size() > 1;
-        previewTitle.setText(isCarousel ? "Carosello pronto" : result.type.equals("video") ? "Video pronto" : "Foto pronta");
-        previewMeta.setText(isCarousel ? result.items.size() + " elementi dal post pubblico"
-                : result.type.equals("video") ? "Anteprima dal post pubblico" : "Immagine dal post pubblico");
+        previewTitle.setText(isCarousel ? "Carousel ready" : result.type.equals("video") ? "Video ready" : "Photo ready");
+        previewMeta.setText(isCarousel ? result.items.size() + " items from the public post"
+                : result.type.equals("video") ? "Preview from the public post" : "Image from the public post");
         previewImage.setImageDrawable(null);
         downloadButton.setEnabled(true);
-        downloadButton.setText(isCarousel ? "Scarica selezionati" : "Scarica");
-        renderCarouselSelections(result); // Aggiunge le opzioni solo quando ci sono più elementi.
+        downloadButton.setText(isCarousel ? "Download selected" : "Download");
+        renderCarouselSelections(result); // Adds choices only when there is more than one item.
         previewContainer.setVisibility(View.VISIBLE);
         String previewUrl = result.items.get(0).previewUrl;
         if (previewUrl != null) loadPreview(previewUrl);
@@ -168,7 +206,7 @@ public final class MainActivity extends Activity {
         carouselSelectionContainer.setVisibility(isCarousel ? View.VISIBLE : View.GONE);
         if (!isCarousel) return;
 
-        // Tre colonne di miniature quadrate, come la griglia della bacheca Instagram.
+        // Three columns of square thumbnails, like the Instagram profile grid.
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(3);
         grid.setUseDefaultMargins(false);
@@ -177,21 +215,21 @@ public final class MainActivity extends Activity {
         int gap = dp(6);
         int cellSize = (getResources().getDisplayMetrics().widthPixels - dp(72) - gap * 2) / 3;
 
-        // Le celle sono create qui perché il loro numero dipende dal carousel analizzato.
+        // Cells are created here because their count depends on the analyzed carousel.
         for (int i = 0; i < result.items.size(); i++) {
             MediaResolver.MediaItem item = result.items.get(i);
             FrameLayout cell = new FrameLayout(this);
             cell.setBackgroundResource(R.drawable.bg_history_icon);
             ImageView thumbnail = new ImageView(this);
-            thumbnail.setContentDescription("Anteprima elemento " + (i + 1));
+            thumbnail.setContentDescription("Item preview " + (i + 1));
             thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
             cell.addView(thumbnail, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
             CheckBox choice = new CheckBox(this);
             choice.setChecked(true);
-            choice.setContentDescription("Seleziona elemento " + (i + 1) + " · "
-                    + ("video".equals(item.type) ? "Video" : "Foto"));
-            // Icona personalizzata: fondo viola e spunta bianca per la selezione attiva.
+            choice.setContentDescription("Select item " + (i + 1) + " · "
+                    + ("video".equals(item.type) ? "Video" : "Photo"));
+            // Custom icon: purple background and white checkmark for active selection.
             choice.setButtonDrawable(R.drawable.carousel_checkbox);
             FrameLayout.LayoutParams checkParams = new FrameLayout.LayoutParams(dp(42), dp(42),
                     android.view.Gravity.END | android.view.Gravity.BOTTOM);
@@ -216,7 +254,7 @@ public final class MainActivity extends Activity {
             selected.add(pendingResult.items.get(0));
             return selected;
         }
-        // L'ordine delle checkbox corrisponde all'ordine dei media restituiti dal resolver.
+        // Checkbox order matches the order of media returned by the resolver.
         for (int i = 0; i < pendingResult.items.size() && i < carouselSelections.size(); i++) {
             if (carouselSelections.get(i).isChecked()) selected.add(pendingResult.items.get(i));
         }
@@ -224,11 +262,11 @@ public final class MainActivity extends Activity {
     }
 
     private void updateDownloadButton() {
-        // Mantiene testo e stato del pulsante coerenti con le selezioni dell'utente.
+        // Keeps the button label and state in sync with the user's selections.
         int count = 0;
         for (CheckBox choice : carouselSelections) if (choice.isChecked()) count++;
         downloadButton.setEnabled(count > 0);
-        downloadButton.setText(count == 0 ? "Seleziona elementi" : "Scarica " + count + " selezionati");
+        downloadButton.setText(count == 0 ? "Select items" : "Download " + count + " selected");
     }
 
     private int dp(int value) {
@@ -245,7 +283,7 @@ public final class MainActivity extends Activity {
     }
 
     private void loadCarouselThumbnail(ImageView target, String imageUrl) {
-        // Le miniature sono facoltative: se una non è disponibile, la checkbox resta comunque usabile.
+        // Thumbnails are optional: the checkbox remains usable if one is unavailable.
         executor.execute(() -> {
             try {
                 Bitmap image = fetchBitmap(imageUrl, 10_000);
@@ -273,7 +311,7 @@ public final class MainActivity extends Activity {
         }
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(item.downloadUrl));
         request.setTitle(item.filename);
-        request.setDescription("Salvataggio in Download/Instasave");
+        request.setDescription("Saving to Download/Instasave");
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Instasave/" + item.filename);
         ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(request);
@@ -284,9 +322,9 @@ public final class MainActivity extends Activity {
             Uri destination = null;
             try {
                 Bitmap image = fetchBitmap(item.downloadUrl, 20_000);
-                if (image == null) throw new IllegalStateException("Il file ricevuto non è un'immagine valida.");
+                if (image == null) throw new IllegalStateException("The received file is not a valid image.");
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                    throw new IllegalStateException("Il salvataggio JPEG richiede Android 10 o successivo.");
+                    throw new IllegalStateException("Saving as JPEG requires Android 10 or later.");
                 }
 
                 ContentValues values = new ContentValues();
@@ -295,16 +333,16 @@ public final class MainActivity extends Activity {
                 values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Instasave");
                 values.put(MediaStore.MediaColumns.IS_PENDING, 1);
                 destination = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-                if (destination == null) throw new IllegalStateException("Impossibile creare il file JPEG.");
+                if (destination == null) throw new IllegalStateException("Unable to create the JPEG file.");
                 try (java.io.OutputStream output = getContentResolver().openOutputStream(destination)) {
                     if (output == null || !image.compress(Bitmap.CompressFormat.JPEG, 100, output)) {
-                        throw new IllegalStateException("Impossibile convertire l'immagine in JPEG.");
+                        throw new IllegalStateException("Unable to convert the image to JPEG.");
                     }
                 }
                 values.clear();
                 values.put(MediaStore.MediaColumns.IS_PENDING, 0);
                 getContentResolver().update(destination, values, null, null);
-                runOnUiThread(() -> showStatus("Foto JPEG salvata in Download/Instasave.", false));
+                runOnUiThread(() -> showStatus("JPEG photo saved to Download/Instasave.", false));
             } catch (Exception error) {
                 if (destination != null) getContentResolver().delete(destination, null, null);
                 runOnUiThread(() -> showStatus(errorMessage(error), true));
@@ -334,22 +372,69 @@ public final class MainActivity extends Activity {
         historyContainer.removeAllViews();
         try {
             JSONArray history = new JSONArray(getPreferences(MODE_PRIVATE).getString(HISTORY_KEY, "[]"));
-            emptyHistory.setVisibility(history.length() == 0 ? View.VISIBLE : View.GONE);
-            for (int i = 0; i < history.length(); i++) addHistoryItem(history.getJSONObject(i));
+            boolean expanded = isHistoryExpanded();
+            String countLabel = history.length() == 0 ? "No downloads"
+                    : history.length() == 1 ? "1 download" : history.length() + " download";
+            historyToggle.setText(countLabel + "  " + (expanded ? "▲" : "▼"));
+            historyToggle.setContentDescription(expanded ? "Collapse download history" : "Expand download history");
+            historyContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            emptyHistory.setVisibility(expanded && history.length() == 0 ? View.VISIBLE : View.GONE);
+            clearHistoryButton.setVisibility(expanded && history.length() > 0 ? View.VISIBLE : View.GONE);
+            for (int i = 0; i < history.length(); i++) addHistoryItem(history.getJSONObject(i), i);
         } catch (Exception ignored) {
             emptyHistory.setVisibility(View.VISIBLE);
+            clearHistoryButton.setVisibility(View.GONE);
         }
     }
 
-    private void addHistoryItem(JSONObject item) throws Exception {
+    private void addHistoryItem(JSONObject item, int position) throws Exception {
         View row = LayoutInflater.from(this).inflate(R.layout.item_history, historyContainer, false);
         String type = item.optString("type", "auto");
-        ((TextView) row.findViewById(R.id.itemIcon)).setText(type.equals("photo") ? "Foto" : type.equals("story") ? "Storia" : type.equals("carousel") ? "Multi" : "Video");
-        ((TextView) row.findViewById(R.id.itemTitle)).setText(type.equals("carousel") ? "Carosello Instagram" : "Contenuto Instagram");
-        ((TextView) row.findViewById(R.id.itemMeta)).setText(labelFor(type) + " · Scaricato ora");
+        ((TextView) row.findViewById(R.id.itemIcon)).setText(type.equals("photo") ? "Photo" : type.equals("story") ? "Story" : type.equals("carousel") ? "Multi" : "Video");
+        ((TextView) row.findViewById(R.id.itemTitle)).setText(type.equals("carousel") ? "Instagram carousel" : "Instagram content");
+        ((TextView) row.findViewById(R.id.itemMeta)).setText(labelFor(type) + " · Downloaded just now");
+        row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeHistoryItem(position));
         historyContainer.addView(row);
         String preview = item.optString("preview", null);
         if (preview != null && !preview.isEmpty()) loadHistoryPreview(row, preview);
+    }
+
+    private boolean isHistoryExpanded() {
+        return getPreferences(MODE_PRIVATE).getBoolean(HISTORY_EXPANDED_KEY, true);
+    }
+
+    private void setHistoryExpanded(boolean expanded) {
+        getPreferences(MODE_PRIVATE).edit().putBoolean(HISTORY_EXPANDED_KEY, expanded).apply();
+        renderHistory();
+    }
+
+    private void confirmClearHistory() {
+        new AlertDialog.Builder(this)
+                .setTitle("Clear history?")
+                .setMessage("Downloaded files will not be deleted.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Clear", (dialog, which) -> {
+                    getPreferences(MODE_PRIVATE).edit().remove(HISTORY_KEY).apply();
+                    renderHistory();
+                    clearStatus();
+                })
+                .show();
+    }
+
+    private void removeHistoryItem(int positionToRemove) {
+        try {
+            JSONArray history = new JSONArray(getPreferences(MODE_PRIVATE).getString(HISTORY_KEY, "[]"));
+            JSONArray next = new JSONArray();
+            for (int i = 0; i < history.length(); i++) {
+                JSONObject item = history.getJSONObject(i);
+                if (i != positionToRemove) next.put(item);
+            }
+            getPreferences(MODE_PRIVATE).edit().putString(HISTORY_KEY, next.toString()).apply();
+            renderHistory();
+            clearStatus();
+        } catch (Exception error) {
+            showStatus("Unable to remove the item from history.", true);
+        }
     }
 
     private void loadHistoryPreview(View row, String imageUrl) {
@@ -372,10 +457,15 @@ public final class MainActivity extends Activity {
         statusText.setVisibility(View.VISIBLE);
     }
 
+    private void clearStatus() {
+        statusText.setText(null);
+        statusText.setVisibility(View.GONE);
+    }
+
     private static String errorMessage(Exception error) {
         String message = error.getMessage();
         return message == null || message.trim().isEmpty()
-                ? "Non è stato possibile elaborare questo contenuto pubblico." : message;
+                ? "Unable to process this public content." : message;
     }
 
     private static boolean isValidUrl(String raw) {
@@ -393,9 +483,9 @@ public final class MainActivity extends Activity {
     }
 
     private static String labelFor(String type) {
-        if ("photo".equals(type)) return "Foto";
-        if ("story".equals(type)) return "Storia";
-        if ("carousel".equals(type)) return "Carosello";
+        if ("photo".equals(type)) return "Photo";
+        if ("story".equals(type)) return "Story";
+        if ("carousel".equals(type)) return "Carousel";
         return "Video";
     }
 

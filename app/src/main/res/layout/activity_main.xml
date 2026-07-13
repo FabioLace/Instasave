@@ -46,23 +46,41 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
-                android:text="Incolla il link del post"
+                android:text="Paste the link"
                 android:textColor="@color/ink"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
-            <EditText
-                android:id="@+id/urlInput"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="54dp"
                 android:layout_marginTop="16dp"
-                android:background="@drawable/bg_input"
-                android:hint="https://instagram.com/..."
-                android:inputType="textUri"
-                android:maxLines="1"
-                android:textColor="@color/ink"
-                android:textColorHint="@color/muted"
-                android:textSize="15sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/urlInput"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:hint="https://instagram.com/..."
+                    android:inputType="textUri"
+                    android:maxLines="1"
+                    android:textColor="@color/ink"
+                    android:textColorHint="@color/muted"
+                    android:textSize="15sp" />
+
+                <ImageButton
+                    android:id="@+id/pasteButton"
+                    android:layout_width="54dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_paste"
+                    android:contentDescription="Paste link from clipboard"
+                    android:padding="15dp"
+                    android:src="@drawable/ic_paste" />
+            </LinearLayout>
 
             <Button
                 android:id="@+id/analyzeButton"
@@ -71,7 +89,7 @@
                 android:layout_marginTop="16dp"
                 android:background="@drawable/bg_primary"
                 android:enabled="false"
-                android:text="Trova il contenuto"
+                android:text="Find content"
                 android:textAllCaps="false"
                 android:textColor="@color/surface"
                 android:textSize="16sp"
@@ -110,7 +128,7 @@
                     android:layout_width="88dp"
                     android:layout_height="88dp"
                     android:background="@drawable/bg_history_icon"
-                    android:contentDescription="Anteprima del contenuto"
+                    android:contentDescription="Content preview"
                     android:scaleType="centerCrop" />
 
                 <LinearLayout
@@ -143,7 +161,7 @@
                     android:layout_marginTop="9dp"
                     android:background="@drawable/bg_paste"
                     android:paddingHorizontal="14dp"
-                    android:text="Scarica"
+                    android:text="Download"
                     android:textAllCaps="false"
                     android:textColor="@color/accent_dark"
                     android:textStyle="bold" />
@@ -156,7 +174,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Scegli gli elementi da scaricare"
+                android:text="Choose items to download"
                 android:textColor="@color/ink"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -172,24 +190,48 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/historyHeader"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="34dp"
-            android:gravity="center_vertical">
+            android:layout_height="44dp"
+            android:layout_marginTop="28dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="4dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="RECENTI"
+                android:text="RECENT"
                 android:textColor="@color/muted"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/clearHistoryButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="I tuoi download"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true"
+                android:contentDescription="Clear download history"
+                android:focusable="true"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="6dp"
+                android:text="Clear"
+                android:textColor="@color/accent_dark"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/historyToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Collapse download history"
+                android:paddingStart="8dp"
+                android:paddingVertical="8dp"
+                android:text="No downloads  ▲"
                 android:textColor="@color/muted"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -209,7 +251,7 @@
             android:background="@drawable/bg_action_card"
             android:gravity="center"
             android:padding="20dp"
-            android:text="Nessun download ancora\nIl primo apparirà qui."
+            android:text="No downloads yet\nYour first one will appear here."
             android:textAlignment="center"
             android:textColor="@color/muted"
             android:textSize="14sp" />
@@ -219,7 +261,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
             android:gravity="center"
-            android:text="Scarica solo contenuti che possiedi o per cui hai il permesso."
+            android:text="Download only content you own or have permission to use."
             android:textColor="@color/muted"
             android:textSize="12sp" />
     </LinearLayout>

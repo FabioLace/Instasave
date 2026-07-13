@@ -67,7 +67,7 @@ final class MediaResolver {
             return new Result(Collections.singletonList(item));
         }
         if (!isInstagramPermalink(sourceUrl)) {
-            throw new IllegalArgumentException("Incolla un permalink Instagram pubblico o un URL media diretto.");
+            throw new IllegalArgumentException("Paste a public Instagram permalink or a direct media URL.");
         }
 
         String html = fetchHtml(sourceUrl);
@@ -106,7 +106,7 @@ final class MediaResolver {
         // public embed exposes the post image and its responsive sources, including the largest one.
         String imageUrl = imageFromPublicEmbed(embedHtml);
         if (imageUrl == null) {
-            throw new IllegalStateException("Instagram non ha esposto un media scaricabile per questo contenuto.");
+            throw new IllegalStateException("Instagram did not expose downloadable media for this content.");
         }
         String filename = "instasave_" + System.currentTimeMillis() + ".jpg";
         return new Result(Collections.singletonList(new MediaItem(imageUrl, filename, "photo", imageUrl)));
@@ -121,7 +121,7 @@ final class MediaResolver {
         connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
         connection.setRequestProperty("Accept", "text/html,application/xhtml+xml");
         if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-            throw new IllegalStateException("Il contenuto pubblico non è disponibile.");
+            throw new IllegalStateException("This public content is unavailable.");
         }
         StringBuilder body = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {

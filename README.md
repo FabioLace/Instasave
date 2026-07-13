@@ -50,6 +50,20 @@ To use only dependencies already available in the local cache:
 
 ## Install on an Emulator or Device
 
+To build, start the default emulator (`Pixel_5`), install, and open the app in one command:
+
+```bash
+./run-emulator.sh
+```
+
+To use another AVD, pass its name:
+
+```bash
+./run-emulator.sh Medium_Phone_API_35
+```
+
+The script uses `ANDROID_SDK_ROOT`/`ANDROID_HOME` when set, otherwise `~/Android/Sdk`.
+
 With an Android device connected and ADB available:
 
 ```bash
