@@ -1,6 +1,7 @@
 <resources>
     <style name="Theme.Instasave" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/canvas</item>
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:navigationBarColor">@color/surface</item>
         <item name="android:statusBarColor">@color/surface</item>
