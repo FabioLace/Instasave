@@ -1,8 +1,18 @@
-# Instasave
+<div align="center">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="Instasave Logo" width="100"/>
 
-Native Android app for analyzing public Instagram permalinks and saving photos, videos, or selected carousel items to the device's `Download/Instasave` folder.
+  <h1>Instasave</h1>
+
+  <p><strong>Download photo, carousels and videos from Instagram</strong></p>
+
+  <p>
+    <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android"/>
+    <img src="https://img.shields.io/badge/java-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java"/>
+  </p>
+</div>
 
 ## Features
+Native Android app for analyzing public Instagram permalinks and saving photos, videos, or selected carousel items to the device's `Download/Instasave` folder.
 
 - Paste an Instagram link or receive one through Android's share sheet.
 - Analyze public posts, reels, and carousels.
