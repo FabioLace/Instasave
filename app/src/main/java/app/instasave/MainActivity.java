@@ -529,6 +529,8 @@ public final class MainActivity extends Activity {
         } else {
             showStatus("Download completed. The file is in Download/Instasave.", false);
         }
+        // Refresh availability and thumbnails once all asynchronous saves have settled.
+        renderHistory();
         uiHandler.postDelayed(this::resetDownloadButton, 3_000L);
     }
 
@@ -566,6 +568,10 @@ public final class MainActivity extends Activity {
                 JSONObject file = new JSONObject()
                         .put("name", filename)
                         .put("type", downloaded.type);
+                // Keep a thumbnail per item so expanded carousel history is visual too.
+                if (downloaded.previewUrl != null && !downloaded.previewUrl.isEmpty()) {
+                    file.put("preview", downloaded.previewUrl);
+                }
                 Long downloadId = downloadIds.get(downloaded);
                 if (downloadId != null) file.put("downloadId", downloadId);
                 files.put(file);
@@ -654,6 +660,7 @@ public final class MainActivity extends Activity {
             child.setContentDescription("Open " + name);
             child.setOnClickListener(v -> openDownloadedFile(file));
             container.addView(child);
+            updateHistoryFileAvailability(child, file);
         }
     }
 
@@ -720,19 +727,85 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void loadHistoryFilePreview(View row, Uri imageUri) {
+        ImageView target = row.findViewById(R.id.historyFilePreview);
+        String imageKey = imageUri.toString();
+        target.setTag(imageKey);
+        imageExecutor.execute(() -> {
+            try {
+                Bitmap image = fetchLocalPreviewBitmap(imageUri, dp(36), dp(36));
+                if (image == null) return;
+                runOnUiThread(() -> {
+                    if (!imageKey.equals(target.getTag())) return;
+                    target.setImageBitmap(image);
+                    target.setVisibility(View.VISIBLE);
+                });
+            } catch (Exception ignored) { }
+        });
+    }
+
+    private Bitmap fetchLocalPreviewBitmap(Uri imageUri, int requestedWidth, int requestedHeight)
+            throws Exception {
+        String cacheKey = imageUri.toString();
+        synchronized (bitmapCache) {
+            Bitmap cached = bitmapCache.get(cacheKey);
+            if (cached != null && cached.getWidth() >= requestedWidth
+                    && cached.getHeight() >= requestedHeight) return cached;
+        }
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (InputStream input = getContentResolver().openInputStream(imageUri)) {
+            if (input == null) return null;
+            BitmapFactory.decodeStream(input, null, bounds);
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight,
+                requestedWidth, requestedHeight);
+        Bitmap image;
+        try (InputStream input = getContentResolver().openInputStream(imageUri)) {
+            if (input == null) return null;
+            image = BitmapFactory.decodeStream(input, null, options);
+        }
+        if (image != null) {
+            synchronized (bitmapCache) {
+                bitmapCache.put(cacheKey, image);
+            }
+        }
+        return image;
+    }
+
+    private void updateHistoryFileAvailability(View row, JSONObject file) {
+        imageExecutor.execute(() -> {
+            Uri localFile = findLocalFile(file);
+            runOnUiThread(() -> {
+                TextView type = row.findViewById(R.id.historyFileType);
+                ImageView preview = row.findViewById(R.id.historyFilePreview);
+                if (localFile == null) {
+                    preview.setTag(null);
+                    preview.setVisibility(View.GONE);
+                    type.setText("");
+                    boolean isVideo = "video".equals(file.optString("type", "photo"));
+                    type.setCompoundDrawablesWithIntrinsicBounds(
+                            isVideo ? R.drawable.ic_video : R.drawable.ic_photo, 0, 0, 0);
+                    type.setContentDescription(isVideo ? "Video file" : "Photo file");
+                    return;
+                }
+                type.setCompoundDrawables(null, null, null, null);
+                if ("photo".equals(file.optString("type", "photo"))) {
+                    // Use the saved JPEG itself: each carousel row gets its real image.
+                    loadHistoryFilePreview(row, localFile);
+                }
+            });
+        });
+    }
+
     private void openDownloadedFile(JSONObject file) {
         if (file == null) return;
-        String filename = file.optString("name", null);
         String type = file.optString("type", "photo");
-        long downloadId = file.optLong("downloadId", -1L);
+        String filename = file.optString("name", null);
         if (filename == null) return;
         imageExecutor.execute(() -> {
-            Uri localFile = null;
-            if ("video".equals(type) && downloadId >= 0) {
-                localFile = ((DownloadManager) getSystemService(DOWNLOAD_SERVICE))
-                        .getUriForDownloadedFile(downloadId);
-            }
-            if (localFile == null) localFile = findDownloadedFile(filename, type);
+            Uri localFile = findLocalFile(file);
             Uri fileUri = localFile;
             runOnUiThread(() -> {
                 if (fileUri == null) {
@@ -750,6 +823,19 @@ public final class MainActivity extends Activity {
                 }
             });
         });
+    }
+
+    private Uri findLocalFile(JSONObject file) {
+        String filename = file.optString("name", null);
+        String type = file.optString("type", "photo");
+        long downloadId = file.optLong("downloadId", -1L);
+        if (filename == null) return null;
+        Uri localFile = null;
+        if ("video".equals(type) && downloadId >= 0) {
+            localFile = ((DownloadManager) getSystemService(DOWNLOAD_SERVICE))
+                    .getUriForDownloadedFile(downloadId);
+        }
+        return localFile != null ? localFile : findDownloadedFile(filename, type);
     }
 
     private Uri findDownloadedFile(String filename, String type) {
@@ -775,7 +861,7 @@ public final class MainActivity extends Activity {
 
     private void showStatus(String message, boolean isError) {
         statusText.setText(message);
-        statusText.setTextColor(getColor(isError ? R.color.accent_dark : R.color.muted));
+        statusText.setTextColor(getColor(isError ? R.color.error : R.color.muted));
         statusText.setVisibility(View.VISIBLE);
     }
 

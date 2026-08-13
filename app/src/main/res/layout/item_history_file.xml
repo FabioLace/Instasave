@@ -9,10 +9,20 @@
     android:paddingStart="68dp"
     android:paddingEnd="14dp">
 
+    <ImageView
+        android:id="@+id/historyFilePreview"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_history_icon"
+        android:contentDescription=""
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/historyFileName"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
         android:layout_weight="1"
         android:ellipsize="middle"
         android:maxLines="1"
