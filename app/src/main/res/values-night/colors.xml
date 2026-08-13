@@ -1,0 +1,17 @@
+<resources>
+    <!-- Semantic names stay the same so every existing surface follows night mode. -->
+    <color name="ink">#F1F0F7</color>
+    <color name="muted">#B9B5C8</color>
+    <color name="surface">#1D1B24</color>
+    <color name="canvas">#121117</color>
+    <color name="line">#373440</color>
+    <color name="accent">#A996FF</color>
+    <color name="accent_dark">#C4B8FF</color>
+    <color name="accent_soft">#302A4C</color>
+    <color name="accent_light">#C1B2FF</color>
+    <color name="accent_soft_pressed">#403865</color>
+    <color name="accent_disabled">#514A70</color>
+    <color name="hero_ink">#FAF8FF</color>
+    <color name="success">#58D5A2</color>
+    <color name="error">#FFB4AB</color>
+</resources>

@@ -8,6 +8,9 @@
     <color name="accent_dark">#5136D3</color>
     <color name="accent_soft">#F0EDFF</color>
     <color name="accent_light">#8D78FF</color>
+    <color name="accent_soft_pressed">#E5E0FF</color>
+    <color name="accent_disabled">#D8D1FA</color>
     <color name="hero_ink">#F8F7FF</color>
     <color name="success">#16845B</color>
+    <color name="error">#B42318</color>
 </resources>

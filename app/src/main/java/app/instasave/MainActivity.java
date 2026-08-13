@@ -34,15 +34,11 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.util.LruCache;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,15 +49,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
-    private static final String HISTORY_KEY = "history";
-    private static final String HISTORY_EXPANDED_KEY = "history_expanded";
     // Keep user-facing analysis independent from optional image loading and file conversion.
     // A slow history thumbnail must never delay a newly submitted link.
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
     private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
-    private final LruCache<String, Bitmap> bitmapCache = createBitmapCache();
+    private ImageLoader imageLoader;
+    private HistoryRepository historyRepository;
     private EditText urlInput;
     private ImageButton pasteButton;
     private ImageButton clearUrlButton;
@@ -100,6 +95,8 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        imageLoader = new ImageLoader(getContentResolver());
+        historyRepository = new HistoryRepository(getPreferences(MODE_PRIVATE));
         setContentView(R.layout.activity_main);
         urlInput = findViewById(R.id.urlInput);
         pasteButton = findViewById(R.id.pasteButton);
@@ -245,7 +242,7 @@ public final class MainActivity extends Activity {
             long id = enqueueDownload(item);
             if (id >= 0) downloadIds.put(item, id);
         }
-        remember(pendingSource, pendingResult, selected, downloadIds);
+        try { historyRepository.add(pendingSource, pendingResult, selected, downloadIds); } catch (Exception ignored) { }
         renderHistory();
     }
 
@@ -352,7 +349,7 @@ public final class MainActivity extends Activity {
         previewImage.setTag(imageUrl);
         imageExecutor.execute(() -> {
             try {
-                Bitmap image = fetchPreviewBitmap(imageUrl, 10_000, dp(88), dp(88));
+                Bitmap image = imageLoader.remoteThumbnail(imageUrl, dp(88), dp(88));
                 if (image != null) runOnUiThread(() -> {
                     if (imageUrl.equals(previewImage.getTag())) previewImage.setImageBitmap(image);
                 });
@@ -365,87 +362,12 @@ public final class MainActivity extends Activity {
         target.setTag(imageUrl);
         imageExecutor.execute(() -> {
             try {
-                Bitmap image = fetchPreviewBitmap(imageUrl, 10_000, targetSize, targetSize);
+                Bitmap image = imageLoader.remoteThumbnail(imageUrl, targetSize, targetSize);
                 if (image != null) runOnUiThread(() -> {
                     if (imageUrl.equals(target.getTag())) target.setImageBitmap(image);
                 });
             } catch (Exception ignored) { }
         });
-    }
-
-    private Bitmap fetchPreviewBitmap(String imageUrl, int readTimeoutMs,
-                                      int requestedWidth, int requestedHeight) throws Exception {
-        synchronized (bitmapCache) {
-            Bitmap cached = bitmapCache.get(imageUrl);
-            if (cached != null && cached.getWidth() >= requestedWidth
-                    && cached.getHeight() >= requestedHeight) return cached;
-        }
-
-        byte[] encoded = fetchImageBytes(imageUrl, readTimeoutMs);
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        BitmapFactory.decodeByteArray(encoded, 0, encoded.length, bounds);
-
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight,
-                requestedWidth, requestedHeight);
-        Bitmap image = BitmapFactory.decodeByteArray(encoded, 0, encoded.length, options);
-        if (image != null) {
-            synchronized (bitmapCache) {
-                Bitmap cached = bitmapCache.get(imageUrl);
-                if (cached == null || image.getByteCount() > cached.getByteCount()) {
-                    bitmapCache.put(imageUrl, image);
-                } else {
-                    image = cached;
-                }
-            }
-        }
-        return image;
-    }
-
-    private static byte[] fetchImageBytes(String imageUrl, int readTimeoutMs) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(imageUrl).openConnection();
-        connection.setConnectTimeout(10_000);
-        connection.setReadTimeout(readTimeoutMs);
-        connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
-        try (InputStream stream = connection.getInputStream();
-             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[16 * 1024];
-            int count;
-            while ((count = stream.read(buffer)) != -1) output.write(buffer, 0, count);
-            return output.toByteArray();
-        } finally {
-            connection.disconnect();
-        }
-    }
-
-    private static Bitmap fetchOriginalBitmap(String imageUrl, int readTimeoutMs) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(imageUrl).openConnection();
-        connection.setConnectTimeout(10_000);
-        connection.setReadTimeout(readTimeoutMs);
-        connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
-        try (InputStream stream = connection.getInputStream()) {
-            return BitmapFactory.decodeStream(stream);
-        } finally {
-            connection.disconnect();
-        }
-    }
-
-    private static int sampleSize(int width, int height, int requestedWidth, int requestedHeight) {
-        int sample = 1;
-        while (width / (sample * 2) >= requestedWidth
-                && height / (sample * 2) >= requestedHeight) sample *= 2;
-        return sample;
-    }
-
-    private static LruCache<String, Bitmap> createBitmapCache() {
-        int maxMemoryKb = (int) (Runtime.getRuntime().maxMemory() / 1024L);
-        int cacheSizeKb = Math.min(16 * 1024, maxMemoryKb / 8);
-        return new LruCache<String, Bitmap>(cacheSizeKb) {
-            @Override protected int sizeOf(String key, Bitmap bitmap) {
-                return Math.max(1, bitmap.getByteCount() / 1024);
-            }
-        };
     }
 
     private long enqueueDownload(MediaResolver.MediaItem item) {
@@ -472,7 +394,7 @@ public final class MainActivity extends Activity {
         saveExecutor.execute(() -> {
             Uri destination = null;
             try {
-                Bitmap image = fetchOriginalBitmap(item.downloadUrl, 20_000);
+                Bitmap image = ImageLoader.fetchOriginal(item.downloadUrl);
                 if (image == null) throw new IllegalStateException("The received file is not a valid image.");
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                     throw new IllegalStateException("Saving as JPEG requires Android 10 or later.");
@@ -529,6 +451,8 @@ public final class MainActivity extends Activity {
         } else {
             showStatus("Download completed. The file is in Download/Instasave.", false);
         }
+        // Refresh availability and thumbnails once all asynchronous saves have settled.
+        renderHistory();
         uiHandler.postDelayed(this::resetDownloadButton, 3_000L);
     }
 
@@ -550,37 +474,10 @@ public final class MainActivity extends Activity {
         return (dot > 0 ? filename.substring(0, dot) : filename) + ".jpg";
     }
 
-    private void remember(String url, MediaResolver.Result result,
-                          List<MediaResolver.MediaItem> downloadedItems,
-                          Map<MediaResolver.MediaItem, Long> downloadIds) {
-        try {
-            JSONArray history = new JSONArray(getPreferences(MODE_PRIVATE).getString(HISTORY_KEY, "[]"));
-            JSONArray next = new JSONArray();
-            String preview = result.items.isEmpty() ? null : result.items.get(0).previewUrl;
-            JSONObject current = new JSONObject().put("url", url).put("type", result.type);
-            if (preview != null) current.put("preview", preview);
-            JSONArray files = new JSONArray();
-            for (MediaResolver.MediaItem downloaded : downloadedItems) {
-                String filename = "photo".equals(downloaded.type)
-                        ? jpegFilename(downloaded.filename) : downloaded.filename;
-                JSONObject file = new JSONObject()
-                        .put("name", filename)
-                        .put("type", downloaded.type);
-                Long downloadId = downloadIds.get(downloaded);
-                if (downloadId != null) file.put("downloadId", downloadId);
-                files.put(file);
-            }
-            current.put("files", files);
-            next.put(current);
-            for (int i = 0; i < history.length() && i < 4; i++) next.put(history.getJSONObject(i));
-            getPreferences(MODE_PRIVATE).edit().putString(HISTORY_KEY, next.toString()).apply();
-        } catch (Exception ignored) { }
-    }
-
     private void renderHistory() {
         historyContainer.removeAllViews();
         try {
-            JSONArray history = new JSONArray(getPreferences(MODE_PRIVATE).getString(HISTORY_KEY, "[]"));
+            JSONArray history = historyRepository.entries();
             boolean expanded = isHistoryExpanded();
             String countLabel = history.length() == 0 ? "No downloads"
                     : history.length() == 1 ? "1 download" : history.length() + " download";
@@ -604,7 +501,7 @@ public final class MainActivity extends Activity {
         LinearLayout filesContainer = row.findViewById(R.id.historyFilesContainer);
         TextView expandIndicator = row.findViewById(R.id.itemExpandIndicator);
         String type = item.optString("type", "auto");
-        JSONArray files = historyFiles(item);
+        JSONArray files = HistoryRepository.files(item);
         boolean isCarousel = "carousel".equals(type);
         ((TextView) row.findViewById(R.id.itemIcon)).setText(type.equals("photo") ? "Photo" : type.equals("story") ? "Story" : type.equals("carousel") ? "Multi" : "Video");
         ((TextView) row.findViewById(R.id.itemTitle)).setText(isCarousel ? "Instagram carousel" : "Instagram content");
@@ -627,20 +524,6 @@ public final class MainActivity extends Activity {
         if (preview != null && !preview.isEmpty()) loadHistoryPreview(row, preview);
     }
 
-    private JSONArray historyFiles(JSONObject item) throws Exception {
-        JSONArray files = item.optJSONArray("files");
-        if (files != null) return files;
-        files = new JSONArray();
-        JSONArray legacyImages = item.optJSONArray("images");
-        if (legacyImages != null) {
-            for (int i = 0; i < legacyImages.length(); i++) {
-                String name = legacyImages.optString(i, null);
-                if (name != null) files.put(new JSONObject().put("name", name).put("type", "photo"));
-            }
-        }
-        return files;
-    }
-
     private void addHistoryFiles(LinearLayout container, JSONArray files) {
         for (int i = 0; i < files.length(); i++) {
             JSONObject file = files.optJSONObject(i);
@@ -654,6 +537,7 @@ public final class MainActivity extends Activity {
             child.setContentDescription("Open " + name);
             child.setOnClickListener(v -> openDownloadedFile(file));
             container.addView(child);
+            updateHistoryFileAvailability(child, file);
         }
     }
 
@@ -666,11 +550,11 @@ public final class MainActivity extends Activity {
     }
 
     private boolean isHistoryExpanded() {
-        return getPreferences(MODE_PRIVATE).getBoolean(HISTORY_EXPANDED_KEY, true);
+        return historyRepository.isExpanded();
     }
 
     private void setHistoryExpanded(boolean expanded) {
-        getPreferences(MODE_PRIVATE).edit().putBoolean(HISTORY_EXPANDED_KEY, expanded).apply();
+        historyRepository.setExpanded(expanded);
         renderHistory();
     }
 
@@ -680,7 +564,7 @@ public final class MainActivity extends Activity {
                 .setMessage("Downloaded files will not be deleted.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Clear", (dialog, which) -> {
-                    getPreferences(MODE_PRIVATE).edit().remove(HISTORY_KEY).apply();
+                    historyRepository.clear();
                     renderHistory();
                     clearStatus();
                 })
@@ -689,13 +573,7 @@ public final class MainActivity extends Activity {
 
     private void removeHistoryItem(int positionToRemove) {
         try {
-            JSONArray history = new JSONArray(getPreferences(MODE_PRIVATE).getString(HISTORY_KEY, "[]"));
-            JSONArray next = new JSONArray();
-            for (int i = 0; i < history.length(); i++) {
-                JSONObject item = history.getJSONObject(i);
-                if (i != positionToRemove) next.put(item);
-            }
-            getPreferences(MODE_PRIVATE).edit().putString(HISTORY_KEY, next.toString()).apply();
+            historyRepository.remove(positionToRemove);
             renderHistory();
             clearStatus();
         } catch (Exception error) {
@@ -708,7 +586,7 @@ public final class MainActivity extends Activity {
         target.setTag(imageUrl);
         imageExecutor.execute(() -> {
             try {
-                Bitmap image = fetchPreviewBitmap(imageUrl, 10_000, dp(42), dp(42));
+                Bitmap image = imageLoader.remoteThumbnail(imageUrl, dp(42), dp(42));
                 if (image == null) return;
                 runOnUiThread(() -> {
                     if (!imageUrl.equals(target.getTag())) return;
@@ -720,19 +598,55 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void loadHistoryFilePreview(View row, Uri imageUri) {
+        ImageView target = row.findViewById(R.id.historyFilePreview);
+        String imageKey = imageUri.toString();
+        target.setTag(imageKey);
+        imageExecutor.execute(() -> {
+            try {
+                Bitmap image = imageLoader.localThumbnail(imageUri, dp(36), dp(36));
+                if (image == null) return;
+                runOnUiThread(() -> {
+                    if (!imageKey.equals(target.getTag())) return;
+                    target.setImageBitmap(image);
+                    target.setVisibility(View.VISIBLE);
+                });
+            } catch (Exception ignored) { }
+        });
+    }
+
+    private void updateHistoryFileAvailability(View row, JSONObject file) {
+        imageExecutor.execute(() -> {
+            Uri localFile = findLocalFile(file);
+            runOnUiThread(() -> {
+                TextView type = row.findViewById(R.id.historyFileType);
+                ImageView preview = row.findViewById(R.id.historyFilePreview);
+                if (localFile == null) {
+                    preview.setTag(null);
+                    preview.setVisibility(View.GONE);
+                    type.setText("");
+                    boolean isVideo = "video".equals(file.optString("type", "photo"));
+                    type.setCompoundDrawablesWithIntrinsicBounds(
+                            isVideo ? R.drawable.ic_video : R.drawable.ic_photo, 0, 0, 0);
+                    type.setContentDescription(isVideo ? "Video file" : "Photo file");
+                    return;
+                }
+                type.setCompoundDrawables(null, null, null, null);
+                if ("photo".equals(file.optString("type", "photo"))) {
+                    // Use the saved JPEG itself: each carousel row gets its real image.
+                    loadHistoryFilePreview(row, localFile);
+                }
+            });
+        });
+    }
+
     private void openDownloadedFile(JSONObject file) {
         if (file == null) return;
-        String filename = file.optString("name", null);
         String type = file.optString("type", "photo");
-        long downloadId = file.optLong("downloadId", -1L);
+        String filename = file.optString("name", null);
         if (filename == null) return;
         imageExecutor.execute(() -> {
-            Uri localFile = null;
-            if ("video".equals(type) && downloadId >= 0) {
-                localFile = ((DownloadManager) getSystemService(DOWNLOAD_SERVICE))
-                        .getUriForDownloadedFile(downloadId);
-            }
-            if (localFile == null) localFile = findDownloadedFile(filename, type);
+            Uri localFile = findLocalFile(file);
             Uri fileUri = localFile;
             runOnUiThread(() -> {
                 if (fileUri == null) {
@@ -750,6 +664,19 @@ public final class MainActivity extends Activity {
                 }
             });
         });
+    }
+
+    private Uri findLocalFile(JSONObject file) {
+        String filename = file.optString("name", null);
+        String type = file.optString("type", "photo");
+        long downloadId = file.optLong("downloadId", -1L);
+        if (filename == null) return null;
+        Uri localFile = null;
+        if ("video".equals(type) && downloadId >= 0) {
+            localFile = ((DownloadManager) getSystemService(DOWNLOAD_SERVICE))
+                    .getUriForDownloadedFile(downloadId);
+        }
+        return localFile != null ? localFile : findDownloadedFile(filename, type);
     }
 
     private Uri findDownloadedFile(String filename, String type) {
@@ -775,7 +702,7 @@ public final class MainActivity extends Activity {
 
     private void showStatus(String message, boolean isError) {
         statusText.setText(message);
-        statusText.setTextColor(getColor(isError ? R.color.accent_dark : R.color.muted));
+        statusText.setTextColor(getColor(isError ? R.color.error : R.color.muted));
         statusText.setVisibility(View.VISIBLE);
     }
 
