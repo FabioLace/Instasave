@@ -1,6 +1,15 @@
-# Instasave
+<div align="center">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="Instasave Logo" width="100"/>
 
-Native Android app for analyzing public Instagram permalinks and saving photos, videos, or selected carousel items to the device's `Download/Instasave` folder.
+  <h1>Instasave</h1>
+
+  <p><strong>Download photo, carousels and videos from Instagram</strong></p>
+
+  <p>
+    <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android"/>
+    <img src="https://img.shields.io/badge/java-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java"/>
+  </p>
+</div>
 
 ## Features
 
@@ -76,8 +85,10 @@ adb shell monkey -p app.instasave 1
 ```text
 app/src/main/
   java/app/instasave/
-    MainActivity.java       # UI, downloads, and history
+    MainActivity.java       # UI coordination and downloads
     MediaResolver.java      # Public media resolution
+    ImageLoader.java        # Remote/local thumbnail loading and cache
+    HistoryRepository.java  # Local download history persistence
   res/
     layout/                 # XML layouts
     drawable/               # UI styles and resources
@@ -90,6 +101,14 @@ app/src/main/
 packaging; the optimized copies in `res/mipmap-*` are used by Android for the launcher icon and
 the logo shown in the app header.
 
-## Usage Note
+## Usage and Disclaimer
 
-Use the app only for content you have the right to download and keep, in compliance with the platform's terms and the respective authors' rights.
+Instasave is a personal hobby project, provided for educational and personal use only. It is not affiliated with, endorsed by, or sponsored by Instagram or Meta.
+
+Use it only for content you own or for which you have explicit permission to download and retain. You are responsible for complying with the platform's terms, applicable law, and the rights of content owners. This project does not include Instagram credentials, cookies, access tokens, or downloaded content.
+
+Availability may change without notice because it depends on third-party services and their policies.
+
+## License
+
+This project is dedicated to the public domain under [CC0 1.0 Universal](LICENSE).
