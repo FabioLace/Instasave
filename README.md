@@ -112,4 +112,4 @@ Availability may change without notice because it depends on third-party service
 
 ## License
 
-This project is dedicated to the public domain under [CC0 1.0 Universal](LICENSE).
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
