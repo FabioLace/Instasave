@@ -12,6 +12,7 @@
 </div>
 
 ## Features
+Native Android app for analyzing public Instagram permalinks and saving photos, videos, or selected carousel items to the device's `Download/Instasave` folder.
 
 - Paste an Instagram link or receive one through Android's share sheet.
 - Analyze public posts, reels, and carousels.
@@ -111,4 +112,4 @@ Availability may change without notice because it depends on third-party service
 
 ## License
 
-This project is dedicated to the public domain under [CC0 1.0 Universal](LICENSE).
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
