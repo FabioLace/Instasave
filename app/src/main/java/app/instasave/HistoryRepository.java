@@ -27,7 +27,10 @@ final class HistoryRepository {
     void add(String url, MediaResolver.Result result, List<MediaResolver.MediaItem> items,
              Map<MediaResolver.MediaItem, Long> ids) throws Exception {
         JSONArray next = new JSONArray();
-        JSONObject current = new JSONObject().put("url", url).put("type", result.type);
+        JSONObject current = new JSONObject()
+                .put("url", url)
+                .put("type", result.type)
+                .put("createdAt", System.currentTimeMillis());
         if (!result.items.isEmpty() && result.items.get(0).previewUrl != null) current.put("preview", result.items.get(0).previewUrl);
         JSONArray files = new JSONArray();
         for (MediaResolver.MediaItem item : items) {
