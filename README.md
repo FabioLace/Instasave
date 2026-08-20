@@ -18,7 +18,8 @@ Native Android app for analyzing public Instagram permalinks and saving photos, 
 - Analyze public posts, reels, and carousels.
 - Preview content before downloading it.
 - Select individual items from a carousel.
-- Keep a local history of initiated downloads.
+- Keep a local history of initiated downloads, with local file availability and previews.
+- Show relative download time (`Downloaded just now`, minutes, hours, or days ago); expanded history refreshes as the time changes.
 
 The app uses only publicly available data and does not require an Instagram login. Content availability depends on Instagram and the post's privacy settings.
 
@@ -86,10 +87,13 @@ adb shell monkey -p app.instasave 1
 ```text
 app/src/main/
   java/app/instasave/
-    MainActivity.java       # UI coordination and downloads
+    MainActivity.java       # Coordinates link analysis and app components
     MediaResolver.java      # Public media resolution
     ImageLoader.java        # Remote/local thumbnail loading and cache
     HistoryRepository.java  # Local download history persistence
+    HistoryController.java  # History rendering, local file access, and age refresh
+    PreviewController.java  # Content preview and carousel item selection
+    DownloadController.java # JPEG saves, DownloadManager requests, and completion state
   res/
     layout/                 # XML layouts
     drawable/               # UI styles and resources
