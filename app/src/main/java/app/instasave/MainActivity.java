@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends Activity {
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
+    private final ExecutorService metadataExecutor = Executors.newFixedThreadPool(2);
     private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private EditText urlInput;
@@ -63,7 +64,7 @@ public final class MainActivity extends Activity {
         ImageButton pasteButton = findViewById(R.id.pasteButton);
         historyRepository = new HistoryRepository(getPreferences(MODE_PRIVATE));
         ImageLoader imageLoader = new ImageLoader(getContentResolver());
-        previewController = new PreviewController(this, imageLoader, imageExecutor);
+        previewController = new PreviewController(this, imageLoader, imageExecutor, metadataExecutor);
         previewController.setDownloadClickListener(v -> downloadPending());
         previewController.setSelectionListener(() -> previewController.updateDownloadButton(downloadInProgress, downloadResetPending));
         historyController = new HistoryController(this, historyRepository, imageLoader, imageExecutor, uiHandler,
@@ -74,8 +75,8 @@ public final class MainActivity extends Activity {
         downloadController = new DownloadController(this, saveExecutor, this::finishDownload);
         registerDownloadReceiver();
 
-        analyzeButton.setOnClickListener(v -> resolveLink());
-        pasteButton.setOnClickListener(v -> pasteLink());
+        analyzeButton.setOnClickListener(v -> { UiMotion.tap(v); resolveLink(); });
+        pasteButton.setOnClickListener(v -> { UiMotion.tap(v); pasteLink(); });
         clearUrlButton.setOnClickListener(v -> { urlInput.setText(""); clearStatus(); });
         urlInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -89,6 +90,8 @@ public final class MainActivity extends Activity {
         });
         receiveSharedLink(getIntent());
         historyController.render();
+        UiMotion.reveal(findViewById(R.id.appHeader), 8, 0);
+        UiMotion.reveal(findViewById(R.id.linkCard), 14, 70);
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
@@ -181,9 +184,14 @@ public final class MainActivity extends Activity {
         statusText.setText(message);
         statusText.setTextColor(getColor(isError ? R.color.error : R.color.muted));
         statusText.setVisibility(View.VISIBLE);
+        UiMotion.reveal(statusText, 5, 0);
     }
 
-    private void clearStatus() { statusText.setText(null); statusText.setVisibility(View.GONE); }
+    private void clearStatus() {
+        statusText.animate().cancel();
+        statusText.setText(null);
+        statusText.setVisibility(View.GONE);
+    }
 
     private static String errorMessage(Exception error) {
         String message = error.getMessage();
@@ -211,6 +219,7 @@ public final class MainActivity extends Activity {
         uiHandler.removeCallbacksAndMessages(null);
         resolverExecutor.shutdownNow();
         imageExecutor.shutdownNow();
+        metadataExecutor.shutdownNow();
         saveExecutor.shutdownNow();
         super.onDestroy();
     }
