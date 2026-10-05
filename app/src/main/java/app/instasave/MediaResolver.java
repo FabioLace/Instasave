@@ -43,12 +43,28 @@ final class MediaResolver {
         final String filename;
         final String type;
         final String previewUrl;
+        final long resolutionArea;
+        final String sourceId;
+        volatile int width;
+        volatile int height;
+        double durationSeconds;
+        volatile long sourceSizeBytes = -1;
 
         MediaItem(String downloadUrl, String filename, String type, String previewUrl) {
+            this(downloadUrl, filename, type, previewUrl, 0, 0, 0, null);
+        }
+
+        MediaItem(String downloadUrl, String filename, String type, String previewUrl,
+                  int width, int height, double durationSeconds, String sourceId) {
             this.downloadUrl = downloadUrl;
             this.filename = filename;
             this.type = type;
             this.previewUrl = previewUrl;
+            this.width = width;
+            this.height = height;
+            this.resolutionArea = (long) width * height;
+            this.durationSeconds = durationSeconds;
+            this.sourceId = sourceId;
         }
     }
 
@@ -74,9 +90,8 @@ final class MediaResolver {
             throw new IllegalArgumentException("Paste a public Instagram permalink or a direct media URL.");
         }
 
-        // Instagram embeds the page's own GraphQL response as inline JSON; when present it gives
-        // full-resolution URLs. Keep it as a fallback: the public embed is more complete for
-        // carousel children.
+        // Both the permalink and its public embed can expose media variants. Compare their
+        // declared resolutions instead of assuming either response always has the largest one.
         String shortcode = shortcodeFrom(sourceUrl);
         // Both documents are needed for the complete fallback chain. Fetch them concurrently so
         // their network latency is not paid back-to-back on every analysis.
@@ -93,7 +108,7 @@ final class MediaResolver {
         }
 
         JSONObject mediaNode = findMediaNode(html, shortcode);
-        List<MediaItem> pageItems = null;
+        List<MediaItem> pageItems = Collections.emptyList();
         if (mediaNode != null) {
             pageItems = mediaItemsFrom(mediaNode);
         }
@@ -101,14 +116,15 @@ final class MediaResolver {
         // The public embed carries carousel children in its contextJSON. That JSON is itself
         // stored as a string inside the embed bootstrap response, so it needs the extra pass in
         // searchForMediaNode() below.
+        List<MediaItem> embedItems = Collections.emptyList();
         if (embedHtml != null) {
             JSONObject embedMediaNode = findMediaNode(embedHtml, shortcode);
             if (embedMediaNode != null) {
-                List<MediaItem> items = mediaItemsFrom(embedMediaNode);
-                if (!items.isEmpty()) return new Result(items);
+                embedItems = mediaItemsFrom(embedMediaNode);
             }
         }
-        if (pageItems != null && !pageItems.isEmpty()) return new Result(pageItems);
+        List<MediaItem> items = bestAvailableItems(pageItems, embedItems);
+        if (!items.isEmpty()) return new Result(items);
 
         String videoUrl = openGraphContent(html, "og:video:secure_url");
         if (videoUrl == null) videoUrl = openGraphContent(html, "og:video");
@@ -278,27 +294,68 @@ final class MediaResolver {
         return items;
     }
 
-    private static void addMediaItem(List<MediaItem> items, JSONObject node, int index) {
-        String displayUrl = bestImageUrl(node);
-        String videoUrl = nonEmpty(node.optString("video_url", null));
-        if (videoUrl == null) {
-            // In older payloads, video URLs are collected in a list of versions.
-            JSONArray versions = node.optJSONArray("video_versions");
-            if (versions != null && versions.length() > 0) {
-                JSONObject version = versions.optJSONObject(0);
-                if (version != null) videoUrl = nonEmpty(version.optString("url", null));
+    private static List<MediaItem> bestAvailableItems(List<MediaItem> pageItems, List<MediaItem> embedItems) {
+        if (pageItems.isEmpty()) return embedItems;
+        if (embedItems.isEmpty()) return pageItems;
+        // Preserve the complete carousel. Match children by ID where possible, since one
+        // response can omit a child and shift all subsequent indexes.
+        List<MediaItem> primary = pageItems.size() > embedItems.size() ? pageItems : embedItems;
+        List<MediaItem> alternate = primary == pageItems ? embedItems : pageItems;
+        List<MediaItem> selected = new ArrayList<>(primary.size());
+        for (int i = 0; i < primary.size(); i++) {
+            MediaItem item = primary.get(i);
+            MediaItem match = null;
+            if (item.sourceId != null) {
+                for (MediaItem candidate : alternate) {
+                    if (item.sourceId.equals(candidate.sourceId)) {
+                        match = candidate;
+                        break;
+                    }
+                }
+            }
+            if (match == null && primary.size() == alternate.size()) {
+                MediaItem candidate = alternate.get(i);
+                if (item.sourceId == null || candidate.sourceId == null) match = candidate;
+            }
+            if (match == null) {
+                selected.add(item);
+            } else {
+                MediaItem preferred = !item.type.equals(match.type)
+                        ? ("video".equals(item.type) ? item : match)
+                        : (match.resolutionArea > item.resolutionArea ? match : item);
+                if (preferred.durationSeconds <= 0) {
+                    preferred.durationSeconds = preferred == item ? match.durationSeconds : item.durationSeconds;
+                }
+                selected.add(preferred);
             }
         }
+        return selected;
+    }
+
+    private static void addMediaItem(List<MediaItem> items, JSONObject node, int index) {
+        ImageCandidate display = bestImage(node);
+        String displayUrl = display == null ? null : display.url;
+        String directVideoUrl = nonEmpty(node.optString("video_url", null));
+        ImageCandidate version = bestCandidate(node.optJSONArray("video_versions"), "url", "width", "height");
+        // video_url has no reliable rendition dimensions. When versions advertise their
+        // resolutions, use the largest declared variant instead of the first one.
+        ImageCandidate video = version != null ? version
+                : directVideoUrl == null ? null : new ImageCandidate(directVideoUrl, 0, 0);
         // Don't rely solely on the "is_video" flag: in more recent reel payloads it can be
         // missing even when video_url/video_versions are present, and without this check the
         // video was being discarded in favor of the preview only.
-        boolean isVideo = videoUrl != null;
-        String url = isVideo ? videoUrl : displayUrl;
+        boolean isVideo = video != null;
+        String url = isVideo ? video.url : displayUrl;
         if (url == null) return;
         String type = isVideo ? "video" : "photo";
         String filename = "instasave_" + System.currentTimeMillis() + "_" + index
                 + (type.equals("video") ? extensionFor(url, ".mp4") : ".jpg");
-        items.add(new MediaItem(url, filename, type, displayUrl));
+        String sourceId = nonEmpty(node.optString("id", null));
+        if (sourceId == null) sourceId = nonEmpty(node.optString("pk", null));
+        double duration = isVideo ? node.optDouble("video_duration", node.optDouble("duration", 0)) : 0;
+        items.add(new MediaItem(url, filename, type, displayUrl,
+                isVideo ? video.width : display.width, isVideo ? video.height : display.height,
+                duration, sourceId));
     }
 
     private static String publicEmbedHtml(String sourceUrl, String shortcode) {
@@ -360,23 +417,26 @@ final class MediaResolver {
      * Instagram can expose several resized versions. Pick the largest declared one rather than
      * blindly using the first thumbnail returned by the page data.
      */
-    private static String bestImageUrl(JSONObject node) {
+    private static ImageCandidate bestImage(JSONObject node) {
         String bestUrl = nonEmpty(node.optString("display_url", null));
-        if (bestUrl == null) bestUrl = nonEmpty(node.optString("thumbnail_src", null));
-        long bestArea = 0;
+        JSONObject dimensions = node.optJSONObject("dimensions");
+        ImageCandidate best = bestUrl == null ? null : new ImageCandidate(bestUrl,
+                dimensions == null ? 0 : dimensions.optInt("width", 0),
+                dimensions == null ? 0 : dimensions.optInt("height", 0));
+        if (bestUrl == null) {
+            bestUrl = nonEmpty(node.optString("thumbnail_src", null));
+            if (bestUrl != null) best = new ImageCandidate(bestUrl, 0, 0);
+        }
         JSONArray displayResources = node.optJSONArray("display_resources");
         ImageCandidate displayCandidate = bestCandidate(displayResources, "src", "config_width", "config_height");
-        if (displayCandidate != null) {
-            bestUrl = displayCandidate.url;
-            bestArea = displayCandidate.area;
-        }
+        if (displayCandidate != null && (best == null || displayCandidate.area > best.area)) best = displayCandidate;
 
         JSONObject imageVersions = node.optJSONObject("image_versions2");
         if (imageVersions != null) {
             ImageCandidate versionCandidate = bestCandidate(imageVersions.optJSONArray("candidates"), "url", "width", "height");
-            if (versionCandidate != null && versionCandidate.area >= bestArea) bestUrl = versionCandidate.url;
+            if (versionCandidate != null && (best == null || versionCandidate.area > best.area)) best = versionCandidate;
         }
-        return bestUrl;
+        return best;
     }
 
     private static ImageCandidate bestCandidate(JSONArray candidates, String urlKey, String widthKey, String heightKey) {
@@ -387,8 +447,9 @@ final class MediaResolver {
             if (candidate == null) continue;
             String url = nonEmpty(candidate.optString(urlKey, null));
             if (url == null) continue;
-            long area = (long) candidate.optInt(widthKey, 0) * candidate.optInt(heightKey, 0);
-            if (best == null || area > best.area) best = new ImageCandidate(url, area);
+            ImageCandidate version = new ImageCandidate(url,
+                    candidate.optInt(widthKey, 0), candidate.optInt(heightKey, 0));
+            if (best == null || version.area > best.area) best = version;
         }
         return best;
     }
@@ -417,11 +478,15 @@ final class MediaResolver {
 
     private static final class ImageCandidate {
         final String url;
+        final int width;
+        final int height;
         final long area;
 
-        ImageCandidate(String url, long area) {
+        ImageCandidate(String url, int width, int height) {
             this.url = url;
-            this.area = area;
+            this.width = width;
+            this.height = height;
+            this.area = (long) width * height;
         }
     }
 

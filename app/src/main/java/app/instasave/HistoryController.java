@@ -39,6 +39,7 @@ final class HistoryController {
     private final TextView historyToggle;
     private final TextView clearHistoryButton;
     private final Runnable refreshRunnable = this::render;
+    private int lastRenderedCount = -1;
 
     HistoryController(Activity activity, HistoryRepository repository, ImageLoader imageLoader,
                       Executor imageExecutor, Handler uiHandler, StatusReporter statusReporter) {
@@ -72,8 +73,12 @@ final class HistoryController {
             clearHistoryButton.setVisibility(expanded && history.length() > 0 ? View.VISIBLE : View.GONE);
             if (expanded) {
                 for (int i = 0; i < history.length(); i++) addItem(history.getJSONObject(i), i);
+                if (lastRenderedCount >= 0 && history.length() > lastRenderedCount && container.getChildCount() > 0) {
+                    UiMotion.reveal(container.getChildAt(0), 10, 0);
+                }
                 scheduleRefresh(history);
             }
+            lastRenderedCount = history.length();
         } catch (Exception ignored) {
             emptyHistory.setVisibility(View.VISIBLE);
             clearHistoryButton.setVisibility(View.GONE);
@@ -131,11 +136,16 @@ final class HistoryController {
     private void toggleFiles(View header, LinearLayout files, TextView indicator) {
         boolean expand = files.getVisibility() != View.VISIBLE;
         files.setVisibility(expand ? View.VISIBLE : View.GONE);
+        if (expand) UiMotion.reveal(files, 8, 0);
         indicator.setText(expand ? "▲" : "▼");
         header.setContentDescription((expand ? "Collapse" : "Expand") + " downloaded carousel files");
     }
 
-    private void setExpanded(boolean expanded) { repository.setExpanded(expanded); render(); }
+    private void setExpanded(boolean expanded) {
+        repository.setExpanded(expanded);
+        render();
+        if (expanded) UiMotion.reveal(container.getChildCount() > 0 ? container : emptyHistory, 10, 0);
+    }
 
     private void confirmClear() {
         new AlertDialog.Builder(activity).setTitle("Clear history?")
@@ -182,6 +192,7 @@ final class HistoryController {
                     if (!imageUrl.equals(target.getTag())) return;
                     target.setImageBitmap(image);
                     target.setVisibility(View.VISIBLE);
+                    UiMotion.fadeIn(target);
                     row.findViewById(R.id.itemIcon).setVisibility(View.GONE);
                 });
             } catch (Exception ignored) { }
@@ -220,6 +231,7 @@ final class HistoryController {
                     if (!imageKey.equals(target.getTag())) return;
                     target.setImageBitmap(image);
                     target.setVisibility(View.VISIBLE);
+                    UiMotion.fadeIn(target);
                 });
             } catch (Exception ignored) { }
         });
