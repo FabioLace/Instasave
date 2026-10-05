@@ -159,7 +159,7 @@ final class MediaResolver {
     }
 
     private static JSONObject findMediaNode(String html, String expectedShortcode) {
-        // Primo tentativo: script JSON dichiarati esplicitamente nella pagina.
+        // First attempt: JSON scripts explicitly declared on the page.
         Matcher matcher = JSON_SCRIPT.matcher(html);
         while (matcher.find()) {
             JSONObject found = mediaNodeFromJson(matcher.group(1), expectedShortcode);
@@ -257,7 +257,7 @@ final class MediaResolver {
 
     private static List<MediaItem> mediaItemsFrom(JSONObject mediaNode) {
         List<MediaItem> items = new ArrayList<>();
-        // Instagram usa sia il formato GraphQL "edges" sia il vecchio array "carousel_media".
+        // Instagram uses both the GraphQL "edges" format and the older "carousel_media" array.
         JSONObject sidecar = mediaNode.optJSONObject("edge_sidecar_to_children");
         JSONArray edges = sidecar != null ? sidecar.optJSONArray("edges") : null;
         if (edges != null) {
@@ -279,20 +279,23 @@ final class MediaResolver {
     }
 
     private static void addMediaItem(List<MediaItem> items, JSONObject node, int index) {
-        boolean isVideo = node.optBoolean("is_video", false);
         String displayUrl = bestImageUrl(node);
         String videoUrl = nonEmpty(node.optString("video_url", null));
         if (videoUrl == null) {
-            // Nei payload meno recenti le URL video sono raccolte in una lista di versioni.
+            // In older payloads, video URLs are collected in a list of versions.
             JSONArray versions = node.optJSONArray("video_versions");
             if (versions != null && versions.length() > 0) {
                 JSONObject version = versions.optJSONObject(0);
                 if (version != null) videoUrl = nonEmpty(version.optString("url", null));
             }
         }
-        String url = isVideo && videoUrl != null ? videoUrl : displayUrl;
+        // Don't rely solely on the "is_video" flag: in more recent reel payloads it can be
+        // missing even when video_url/video_versions are present, and without this check the
+        // video was being discarded in favor of the preview only.
+        boolean isVideo = videoUrl != null;
+        String url = isVideo ? videoUrl : displayUrl;
         if (url == null) return;
-        String type = isVideo && videoUrl != null ? "video" : "photo";
+        String type = isVideo ? "video" : "photo";
         String filename = "instasave_" + System.currentTimeMillis() + "_" + index
                 + (type.equals("video") ? extensionFor(url, ".mp4") : ".jpg");
         items.add(new MediaItem(url, filename, type, displayUrl));
