@@ -64,7 +64,7 @@ final class PreviewController {
     void show(MediaResolver.Result result, boolean downloadInProgress) {
         displayedResult = result;
         boolean carousel = result.items.size() > 1;
-        title.setText(carousel ? "Carousel ready" : "video".equals(result.type) ? "Video ready" : "Photo ready");
+        title.setText(carousel ? R.string.preview_carousel_ready : "video".equals(result.type) ? R.string.preview_video_ready : R.string.preview_photo_ready);
         image.animate().cancel();
         image.setAlpha(1f);
         image.setImageDrawable(null);
@@ -107,7 +107,7 @@ final class PreviewController {
     void updateDownloadButton(boolean inProgress, boolean resetPending) {
         if (inProgress) {
             downloadButton.setEnabled(false);
-            downloadButton.setText("Download started");
+            downloadButton.setText(R.string.download_started);
             return;
         }
         if (resetPending) {
@@ -116,12 +116,14 @@ final class PreviewController {
         }
         int selected = selectedCount();
         downloadButton.setEnabled(selected > 0);
-        downloadButton.setText(selected == 0 ? "Select items" : selected == 1 ? "Download" : "Download " + selected + " selected");
+        downloadButton.setText(selected == 0 ? activity.getString(R.string.download_select_items)
+                : selected == 1 ? activity.getString(R.string.download_action)
+                : activity.getString(R.string.download_selected, selected));
     }
 
     void showDownloadFinished(boolean failed) {
         downloadButton.setEnabled(false);
-        downloadButton.setText(failed ? "Download failed" : "Download completed");
+        downloadButton.setText(failed ? R.string.download_failed : R.string.download_completed);
     }
 
     private void renderSelections(MediaResolver.Result result) {
@@ -149,12 +151,12 @@ final class PreviewController {
         cell.setBackgroundResource(R.drawable.bg_history_icon);
         tile.addView(cell, new LinearLayout.LayoutParams(cellSize, cellSize));
         ImageView thumbnail = new ImageView(activity);
-        thumbnail.setContentDescription("Item preview " + (position + 1));
+        thumbnail.setContentDescription(activity.getString(R.string.preview_item_thumbnail, position + 1));
         thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
         cell.addView(thumbnail, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         CheckBox choice = new CheckBox(activity);
         choice.setChecked(true);
-        choice.setContentDescription("Select item " + (position + 1) + " · " + ("video".equals(item.type) ? "Video" : "Photo"));
+        choice.setContentDescription(selectionDescription(position, item));
         choice.setButtonDrawable(R.drawable.carousel_checkbox);
         choice.setPadding(0, 0, 0, 0);
         choice.setOnCheckedChangeListener((button, checked) -> {
@@ -198,12 +200,12 @@ final class PreviewController {
         boolean carousel = result.items.size() > 1;
         if (!carousel) {
             MediaResolver.MediaItem item = result.items.get(0);
-            String description = "video".equals(item.type) ? "Preview from the public post" : "Image from the public post";
+            String description = activity.getString("video".equals(item.type) ? R.string.preview_video_source : R.string.preview_photo_source);
             String details = formatDetails(item);
             meta.setText(details.isEmpty() ? description : description + "\n" + details);
             return;
         }
-        meta.setText(result.items.size() + " items from the public post");
+        meta.setText(activity.getString(R.string.preview_items_source, result.items.size()));
         for (int i = 0; i < result.items.size() && i < detailsLabels.size(); i++) {
             String details = formatDetails(result.items.get(i));
             TextView label = detailsLabels.get(i);
@@ -211,13 +213,17 @@ final class PreviewController {
             label.setVisibility(details.isEmpty() ? View.GONE : View.VISIBLE);
             if (!details.isEmpty()) {
                 CheckBox choice = selections.get(i);
-                choice.setContentDescription("Select item " + (i + 1) + " · "
-                        + ("video".equals(result.items.get(i).type) ? "Video" : "Photo") + " · " + details);
+                choice.setContentDescription(selectionDescription(i, result.items.get(i)) + " · " + details);
             }
         }
     }
 
-    private static String formatDetails(MediaResolver.MediaItem item) {
+    private String selectionDescription(int position, MediaResolver.MediaItem item) {
+        return activity.getString(R.string.preview_select_item, position + 1) + " · "
+                + activity.getString("video".equals(item.type) ? R.string.type_video : R.string.type_photo);
+    }
+
+    private String formatDetails(MediaResolver.MediaItem item) {
         List<String> parts = new ArrayList<>(3);
         if (item.width > 0 && item.height > 0) parts.add(item.width + "×" + item.height);
         if (Double.isFinite(item.durationSeconds) && item.durationSeconds > 0) {
@@ -228,9 +234,9 @@ final class PreviewController {
         }
         if (item.sourceSizeBytes > 0) {
             double bytes = item.sourceSizeBytes;
-            parts.add(bytes >= 1_000_000 ? String.format(Locale.ROOT, "Source %.1f MB", bytes / 1_000_000)
-                    : bytes >= 1_000 ? String.format(Locale.ROOT, "Source %.0f KB", bytes / 1_000)
-                    : "Source " + item.sourceSizeBytes + " B");
+            parts.add(bytes >= 1_000_000 ? activity.getString(R.string.preview_source_mb, bytes / 1_000_000)
+                    : bytes >= 1_000 ? activity.getString(R.string.preview_source_kb, bytes / 1_000)
+                    : activity.getString(R.string.preview_source_bytes, item.sourceSizeBytes));
         }
         return TextUtils.join(" · ", parts);
     }

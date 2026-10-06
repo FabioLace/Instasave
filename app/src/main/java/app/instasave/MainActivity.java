@@ -114,26 +114,26 @@ public final class MainActivity extends Activity {
         if (shared == null) return;
         urlInput.setText(extractUrl(shared));
         urlInput.setSelection(urlInput.length());
-        showStatus("Instagram link received. Ready to analyze.", false);
+        showStatus(R.string.status_link_received, false);
     }
 
     private void pasteLink() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (clipboard == null || !clipboard.hasPrimaryClip()) { showStatus("Clipboard is empty.", true); return; }
+        if (clipboard == null || !clipboard.hasPrimaryClip()) { showStatus(R.string.status_clipboard_empty, true); return; }
         ClipData clip = clipboard.getPrimaryClip();
-        if (clip == null || clip.getItemCount() == 0) { showStatus("Clipboard is empty.", true); return; }
+        if (clip == null || clip.getItemCount() == 0) { showStatus(R.string.status_clipboard_empty, true); return; }
         CharSequence content = clip.getItemAt(0).coerceToText(this);
         String link = content == null ? "" : extractUrl(content.toString());
-        if (!isValidUrl(link)) { showStatus("Clipboard doesn't contain a valid link.", true); return; }
+        if (!isValidUrl(link)) { showStatus(R.string.status_clipboard_invalid, true); return; }
         urlInput.setText(link);
         urlInput.setSelection(urlInput.length());
-        showStatus("Link pasted. Ready to analyze.", false);
+        showStatus(R.string.status_link_pasted, false);
     }
 
     private void resolveLink() {
         String source = urlInput.getText().toString().trim();
         analyzeButton.setEnabled(false);
-        showStatus("Analyzing content...", false);
+        showStatus(R.string.status_analyzing, false);
         resolverExecutor.execute(() -> {
             try {
                 MediaResolver.Result result = new MediaResolver().resolve(source);
@@ -149,17 +149,17 @@ public final class MainActivity extends Activity {
         pendingResult = result;
         pendingSource = source;
         previewController.show(result, downloadInProgress);
-        showStatus("Content ready to download.", false);
+        showStatus(R.string.status_content_ready, false);
         analyzeButton.setEnabled(true);
     }
 
     private void downloadPending() {
         if (pendingResult == null) return;
         List<MediaResolver.MediaItem> selected = previewController.selectedItems(pendingResult);
-        if (selected.isEmpty()) { showStatus("Select at least one item to download.", true); return; }
+        if (selected.isEmpty()) { showStatus(R.string.status_select_item, true); return; }
         downloadInProgress = true;
         previewController.updateDownloadButton(true, false);
-        showStatus(selected.size() > 1 ? "Downloads started. Find them in notifications." : "Download started. Find it in notifications.", false);
+        showStatus(selected.size() > 1 ? R.string.status_downloads_started : R.string.status_download_started, false);
         Map<MediaResolver.MediaItem, Long> ids = downloadController.start(selected);
         try { historyRepository.add(pendingSource, pendingResult, selected, ids); } catch (Exception ignored) { }
         historyController.render();
@@ -169,8 +169,8 @@ public final class MainActivity extends Activity {
         downloadInProgress = false;
         downloadResetPending = true;
         previewController.showDownloadFinished(failed);
-        if (failed) showStatus(failureMessage == null ? "One or more downloads could not be completed." : failureMessage, true);
-        else showStatus("Download completed. The file is in Download/Instasave.", false);
+        if (failed) showStatus(failureMessage == null ? getString(R.string.status_downloads_failed) : failureMessage, true);
+        else showStatus(R.string.status_download_completed, false);
         historyController.render();
         uiHandler.postDelayed(this::resetDownloadButton, 3_000L);
     }
@@ -179,6 +179,8 @@ public final class MainActivity extends Activity {
         downloadResetPending = false;
         previewController.updateDownloadButton(false, false);
     }
+
+    private void showStatus(int messageRes, boolean isError) { showStatus(getString(messageRes), isError); }
 
     private void showStatus(String message, boolean isError) {
         statusText.setText(message);
@@ -193,9 +195,10 @@ public final class MainActivity extends Activity {
         statusText.setVisibility(View.GONE);
     }
 
-    private static String errorMessage(Exception error) {
+    private String errorMessage(Exception error) {
+        if (error instanceof UserFacingException) return getString(((UserFacingException) error).messageRes);
         String message = error.getMessage();
-        return message == null || message.trim().isEmpty() ? "Unable to process this public content." : message;
+        return message == null || message.trim().isEmpty() ? getString(R.string.error_generic) : message;
     }
 
     private static boolean isValidUrl(String raw) {

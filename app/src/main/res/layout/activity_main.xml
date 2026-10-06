@@ -47,7 +47,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
-                android:text="Paste the link"
+                android:text="@string/link_title"
                 android:textColor="@color/ink"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -86,7 +86,7 @@
                         android:layout_height="match_parent"
                         android:layout_gravity="end"
                         android:background="?android:attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Clear link"
+                        android:contentDescription="@string/link_clear"
                         android:padding="13dp"
                         android:src="@drawable/ic_clear"
                         android:visibility="gone" />
@@ -98,7 +98,7 @@
                     android:layout_height="match_parent"
                     android:layout_marginStart="8dp"
                     android:background="@drawable/bg_paste"
-                    android:contentDescription="Paste link from clipboard"
+                    android:contentDescription="@string/link_paste"
                     android:padding="15dp"
                     android:src="@drawable/ic_paste" />
             </LinearLayout>
@@ -110,7 +110,7 @@
                 android:layout_marginTop="16dp"
                 android:background="@drawable/bg_primary"
                 android:enabled="false"
-                android:text="Find content"
+                android:text="@string/link_analyze"
                 android:textAllCaps="false"
                 android:textColor="@color/surface"
                 android:textSize="16sp"
@@ -149,7 +149,7 @@
                     android:layout_width="88dp"
                     android:layout_height="88dp"
                     android:background="@drawable/bg_history_icon"
-                    android:contentDescription="Content preview"
+                    android:contentDescription="@string/preview_image"
                     android:scaleType="centerCrop" />
 
                 <LinearLayout
@@ -182,7 +182,7 @@
                     android:layout_marginTop="9dp"
                     android:background="@drawable/bg_paste"
                     android:paddingHorizontal="14dp"
-                    android:text="Download"
+                    android:text="@string/download_action"
                     android:textAllCaps="false"
                     android:textColor="@color/accent_dark"
                     android:textStyle="bold" />
@@ -195,7 +195,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Choose items to download"
+                android:text="@string/preview_choose_items"
                 android:textColor="@color/ink"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -225,7 +225,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="RECENT"
+                android:text="@string/history_title"
                 android:textColor="@color/muted"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -236,11 +236,11 @@
                 android:layout_height="wrap_content"
                 android:background="?android:attr/selectableItemBackground"
                 android:clickable="true"
-                android:contentDescription="Clear download history"
+                android:contentDescription="@string/history_clear_description"
                 android:focusable="true"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="6dp"
-                android:text="Clear"
+                android:text="@string/history_clear"
                 android:textColor="@color/accent_dark"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -249,10 +249,10 @@
                 android:id="@+id/historyToggle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="Collapse download history"
+                android:contentDescription="@string/history_collapse"
                 android:paddingStart="8dp"
                 android:paddingVertical="8dp"
-                android:text="No downloads  ▲"
+                android:text="@string/history_count_none"
                 android:textColor="@color/muted"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -272,7 +272,7 @@
             android:background="@drawable/bg_action_card"
             android:gravity="center"
             android:padding="20dp"
-            android:text="No downloads yet\nYour first one will appear here."
+            android:text="@string/history_empty"
             android:textAlignment="center"
             android:textColor="@color/muted"
             android:textSize="14sp" />
@@ -282,7 +282,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
             android:gravity="center"
-            android:text="Download only content you own or have permission to use."
+            android:text="@string/disclaimer"
             android:textColor="@color/muted"
             android:textSize="12sp" />
     </LinearLayout>
