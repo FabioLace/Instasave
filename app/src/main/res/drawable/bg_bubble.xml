@@ -1,4 +1,8 @@
+<!-- Same diagonal gradient as the launcher icon, so the bubble reads as Instasave over any app. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
-    <solid android:color="@color/accent" />
-    <stroke android:width="2dp" android:color="@color/hero_ink" />
+    <gradient
+        android:angle="315"
+        android:centerColor="#9C3CD9"
+        android:endColor="#01A2FC"
+        android:startColor="#F50CA2" />
 </shape>

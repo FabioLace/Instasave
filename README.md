@@ -25,7 +25,7 @@ Native Android app for analyzing public Instagram permalinks and saving photos, 
 
 ### Floating bubble
 
-Enable **Floating bubble** at the bottom of the main screen. The first time, Android asks for notifications (used for the bubble's *Hide bubble* action) and for permission to display over other apps. While enabled, a foreground service keeps a draggable bubble on screen that snaps to the nearest edge.
+Enable **Floating bubble** at the bottom of the main screen. The first time, Android asks for notifications (used for the bubble's *Hide bubble* action) and for permission to display over other apps. While enabled, a foreground service keeps a draggable bubble on screen that snaps to the nearest edge. To hide it, drag it onto the ✕ that appears at the bottom of the screen, turn off the switch, or use *Hide bubble* in its notification.
 
 In Instagram, tap **Share → Copy link**, then tap the bubble: Instasave reads the link from the clipboard, shows a preview, and downloads every item (for carousels, *Open in Instasave* lets you pick individual items). Since Android 10 only the focused app can read the clipboard, so the bubble opens a translucent sheet instead of reading it from the background service. Bubble downloads appear in the app's history.
 

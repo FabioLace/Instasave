@@ -10,7 +10,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.content.res.ColorStateList;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Icon;
 import android.os.Build;
@@ -22,6 +24,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 /** Keeps a draggable bubble above other apps; tapping it opens the quick download sheet. */
@@ -34,7 +37,10 @@ public final class BubbleService extends Service {
     private static volatile boolean enabled;
     private WindowManager windowManager;
     private WindowManager.LayoutParams params;
-    private ImageView bubble;
+    // The window is larger than the visible button so the button's shadow is not clipped.
+    private FrameLayout bubble;
+    private ImageView button;
+    private ImageView dismissTarget;
 
     static boolean isEnabled() { return enabled; }
 
@@ -88,35 +94,77 @@ public final class BubbleService extends Service {
     @SuppressLint("ClickableViewAccessibility")
     private void showBubble() {
         windowManager = getSystemService(WindowManager.class);
-        int size = dp(56);
-        bubble = new ImageView(this);
-        bubble.setImageResource(R.drawable.ic_download);
-        bubble.setBackgroundResource(R.drawable.bg_bubble);
-        bubble.setScaleType(ImageView.ScaleType.CENTER);
-        bubble.setContentDescription(getString(R.string.bubble_description));
-        bubble.setOnClickListener(v -> openQuickDownload());
-        bubble.setOnTouchListener(new DragListener());
+        int shadowSpace = dp(8);
+        int size = dp(56) + shadowSpace * 2;
+        button = new ImageView(this);
+        button.setImageResource(R.drawable.ic_bubble_download);
+        button.setBackgroundResource(R.drawable.bg_bubble);
+        button.setScaleType(ImageView.ScaleType.CENTER);
+        button.setElevation(dp(5));
+        button.setContentDescription(getString(R.string.bubble_description));
+        button.setOnClickListener(v -> openQuickDownload());
+        button.setOnTouchListener(new DragListener());
+        bubble = new FrameLayout(this);
+        bubble.setPadding(shadowSpace, shadowSpace, shadowSpace, shadowSpace);
+        bubble.setClipToPadding(false);
+        bubble.addView(button, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         params = new WindowManager.LayoutParams(size, size, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
         DisplayMetrics metrics = getResources().getDisplayMetrics();
-        params.x = metrics.widthPixels - size - dp(8);
+        params.x = metrics.widthPixels - size;
         params.y = metrics.heightPixels / 3;
+        // Added first so it stays below the bubble, which can then be dropped onto it.
+        addDismissTarget();
         windowManager.addView(bubble, params);
     }
 
+    private void addDismissTarget() {
+        int size = dp(64);
+        dismissTarget = new ImageView(this);
+        dismissTarget.setImageResource(R.drawable.ic_clear);
+        dismissTarget.setImageTintList(ColorStateList.valueOf(Color.WHITE));
+        dismissTarget.setBackgroundResource(R.drawable.bg_bubble_dismiss);
+        dismissTarget.setScaleType(ImageView.ScaleType.CENTER);
+        dismissTarget.setVisibility(View.GONE);
+        WindowManager.LayoutParams target = new WindowManager.LayoutParams(size, size,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT);
+        target.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        target.y = dp(48);
+        windowManager.addView(dismissTarget, target);
+    }
+
+    private void showDismissTarget(boolean visible) {
+        dismissTarget.animate().cancel();
+        dismissTarget.setScaleX(1f);
+        dismissTarget.setScaleY(1f);
+        dismissTarget.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (visible) UiMotion.fadeIn(dismissTarget);
+    }
+
+    /** Whether a finger at these screen coordinates is close enough to the target to drop the bubble. */
+    private boolean isOverDismissTarget(float rawX, float rawY) {
+        if (dismissTarget.getVisibility() != View.VISIBLE) return false;
+        int[] location = new int[2];
+        dismissTarget.getLocationOnScreen(location);
+        float centerX = location[0] + dismissTarget.getWidth() / 2f;
+        float centerY = location[1] + dismissTarget.getHeight() / 2f;
+        return Math.hypot(rawX - centerX, rawY - centerY) < dp(72);
+    }
+
     private void openQuickDownload() {
-        UiMotion.tap(bubble);
+        UiMotion.tap(button);
         startActivity(new Intent(this, QuickDownloadActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
 
-    /** Moves the bubble to the nearest side, keeping it fully on screen. */
+    /** Moves the bubble to the nearest side, keeping it fully on screen; the shadow space acts as margin. */
     private void snapToEdge() {
         if (bubble == null || !bubble.isAttachedToWindow()) return;
         DisplayMetrics metrics = getResources().getDisplayMetrics();
         int size = params.width;
-        int margin = dp(8);
-        int targetX = params.x + size / 2 < metrics.widthPixels / 2 ? margin : metrics.widthPixels - size - margin;
+        int targetX = params.x + size / 2 < metrics.widthPixels / 2 ? 0 : metrics.widthPixels - size;
         params.y = Math.max(0, Math.min(params.y, metrics.heightPixels - size));
         ValueAnimator animator = ValueAnimator.ofInt(params.x, targetX).setDuration(180);
         animator.addUpdateListener(animation -> {
@@ -135,12 +183,16 @@ public final class BubbleService extends Service {
     @Override public void onDestroy() {
         enabled = false;
         if (bubble != null && bubble.isAttachedToWindow()) windowManager.removeView(bubble);
+        if (dismissTarget != null && dismissTarget.isAttachedToWindow()) windowManager.removeView(dismissTarget);
         super.onDestroy();
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
-    /** Drags the bubble; a touch that never exceeds the touch slop is delivered as a click. */
+    /**
+     * Drags the bubble; a touch that never exceeds the touch slop is delivered as a click. Dropping
+     * the bubble on the target at the bottom hides it, like closing the service from the app.
+     */
     private final class DragListener implements View.OnTouchListener {
         private final int touchSlop = ViewConfiguration.get(BubbleService.this).getScaledTouchSlop();
         private float downX;
@@ -148,6 +200,7 @@ public final class BubbleService extends Service {
         private int startX;
         private int startY;
         private boolean dragging;
+        private boolean overTarget;
 
         @Override public boolean onTouch(View view, MotionEvent event) {
             switch (event.getActionMasked()) {
@@ -157,22 +210,31 @@ public final class BubbleService extends Service {
                     startX = params.x;
                     startY = params.y;
                     dragging = false;
+                    overTarget = false;
                     return true;
                 case MotionEvent.ACTION_MOVE:
                     float dx = event.getRawX() - downX;
                     float dy = event.getRawY() - downY;
                     if (!dragging && Math.hypot(dx, dy) < touchSlop) return true;
+                    if (!dragging) showDismissTarget(true);
                     dragging = true;
                     params.x = startX + Math.round(dx);
                     params.y = startY + Math.round(dy);
                     windowManager.updateViewLayout(bubble, params);
+                    boolean over = isOverDismissTarget(event.getRawX(), event.getRawY());
+                    if (over != overTarget) {
+                        overTarget = over;
+                        dismissTarget.animate().scaleX(over ? 1.25f : 1f).scaleY(over ? 1.25f : 1f).setDuration(120).start();
+                    }
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (dragging) snapToEdge();
-                    else view.performClick();
+                    if (!dragging) { view.performClick(); return true; }
+                    showDismissTarget(false);
+                    if (overTarget) stopSelf();
+                    else snapToEdge();
                     return true;
                 case MotionEvent.ACTION_CANCEL:
-                    if (dragging) snapToEdge();
+                    if (dragging) { showDismissTarget(false); snapToEdge(); }
                     return true;
                 default:
                     return false;

@@ -1,0 +1,21 @@
+<!-- The launcher icon's arrow and tray, drawn with rounded strokes for the floating bubble. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12,4.5V11.5"
+        android:strokeColor="@android:color/white"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.2" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M8.4,10.6h7.2a0.6,0.6 0,0 1,0.45 1l-3.6,4a0.6,0.6 0,0 1,-0.9 0l-3.6,-4a0.6,0.6 0,0 1,0.45 -1z" />
+    <path
+        android:pathData="M5,14v3a2,2 0,0 0,2 2h10a2,2 0,0 0,2 -2v-3"
+        android:strokeColor="@android:color/white"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2.2" />
+</vector>
