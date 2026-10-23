@@ -115,5 +115,21 @@
         <item quantity="other">Scaricato %d giorni fa</item>
     </plurals>
 
+    <!-- Floating bubble -->
+    <string name="bubble_title">Bolla fluttuante</string>
+    <string name="bubble_summary">Scarica senza uscire da Instagram: copia il link di un post, poi tocca la bolla.</string>
+    <string name="bubble_description">Scarica il link copiato</string>
+    <string name="bubble_notification_title">La bolla di Instasave è attiva</string>
+    <string name="bubble_notification_text">Copia il link di un post su Instagram, poi tocca la bolla.</string>
+    <string name="bubble_notification_stop">Nascondi bolla</string>
+    <string name="bubble_permission_denied">Consenti a Instasave di apparire sopra le altre app per usare la bolla.</string>
+
+    <!-- Quick download sheet -->
+    <string name="quick_no_link_title">Nessun link copiato</string>
+    <string name="quick_no_link_message">Su Instagram tocca Condividi → Copia link, poi tocca di nuovo la bolla.</string>
+    <string name="quick_error_title">Contenuto non disponibile</string>
+    <string name="quick_download_all">Scarica tutto (%1$d)</string>
+    <string name="quick_open_app">Apri in Instasave</string>
+
     <string name="disclaimer">Scarica solo contenuti tuoi o che hai il permesso di usare.</string>
 </resources>

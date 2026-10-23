@@ -15,12 +15,19 @@
 Native Android app for analyzing public Instagram permalinks and saving photos, videos, or selected carousel items to the device's `Download/Instasave` folder.
 
 - Paste an Instagram link or receive one through Android's share sheet.
+- Download without leaving Instagram with the floating bubble: copy a post's link, tap the bubble, and save it from a compact sheet shown over the app.
 - Analyze public posts, reels, and carousels.
 - Preview content before downloading it.
 - Select individual items from a carousel.
 - Keep a local history of initiated downloads, with local file availability and previews.
 - Show relative download time (`Downloaded just now`, minutes, hours, or days ago); expanded history refreshes as the time changes.
 - Available in English, Italian, French, and Spanish, following the device language.
+
+### Floating bubble
+
+Enable **Floating bubble** at the bottom of the main screen. The first time, Android asks for notifications (used for the bubble's *Hide bubble* action) and for permission to display over other apps. While enabled, a foreground service keeps a draggable bubble on screen that snaps to the nearest edge.
+
+In Instagram, tap **Share → Copy link**, then tap the bubble: Instasave reads the link from the clipboard, shows a preview, and downloads every item (for carousels, *Open in Instasave* lets you pick individual items). Since Android 10 only the focused app can read the clipboard, so the bubble opens a translucent sheet instead of reading it from the background service. Bubble downloads appear in the app's history.
 
 The app uses only publicly available data and does not require an Instagram login. Content availability depends on Instagram and the post's privacy settings.
 
@@ -95,6 +102,8 @@ app/src/main/
     HistoryController.java  # History rendering, local file access, and age refresh
     PreviewController.java  # Content preview and carousel item selection
     DownloadController.java # JPEG saves, DownloadManager requests, and completion state
+    BubbleService.java      # Floating bubble shown over other apps (foreground service)
+    QuickDownloadActivity.java # Sheet opened by the bubble: clipboard link, preview, download
   res/
     layout/                 # XML layouts
     drawable/               # UI styles and resources

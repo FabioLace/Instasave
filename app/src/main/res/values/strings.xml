@@ -115,5 +115,21 @@
         <item quantity="other">Downloaded %d days ago</item>
     </plurals>
 
+    <!-- Floating bubble -->
+    <string name="bubble_title">Floating bubble</string>
+    <string name="bubble_summary">Download without leaving Instagram: copy a post\'s link, then tap the bubble.</string>
+    <string name="bubble_description">Download the copied link</string>
+    <string name="bubble_notification_title">Instasave bubble is active</string>
+    <string name="bubble_notification_text">Copy a post\'s link in Instagram, then tap the bubble.</string>
+    <string name="bubble_notification_stop">Hide bubble</string>
+    <string name="bubble_permission_denied">Allow Instasave to display over other apps to use the bubble.</string>
+
+    <!-- Quick download sheet -->
+    <string name="quick_no_link_title">No link copied</string>
+    <string name="quick_no_link_message">In Instagram, tap Share → Copy link, then tap the bubble again.</string>
+    <string name="quick_error_title">Content not available</string>
+    <string name="quick_download_all">Download all (%1$d)</string>
+    <string name="quick_open_app">Open in Instasave</string>
+
     <string name="disclaimer">Download only content you own or have permission to use.</string>
 </resources>

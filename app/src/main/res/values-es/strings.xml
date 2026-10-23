@@ -115,5 +115,21 @@
         <item quantity="other">Descargado hace %d días</item>
     </plurals>
 
+    <!-- Floating bubble -->
+    <string name="bubble_title">Burbuja flotante</string>
+    <string name="bubble_summary">Descarga sin salir de Instagram: copia el enlace de una publicación y toca la burbuja.</string>
+    <string name="bubble_description">Descargar el enlace copiado</string>
+    <string name="bubble_notification_title">La burbuja de Instasave está activa</string>
+    <string name="bubble_notification_text">Copia el enlace de una publicación en Instagram y toca la burbuja.</string>
+    <string name="bubble_notification_stop">Ocultar burbuja</string>
+    <string name="bubble_permission_denied">Permite que Instasave se muestre sobre otras apps para usar la burbuja.</string>
+
+    <!-- Quick download sheet -->
+    <string name="quick_no_link_title">Ningún enlace copiado</string>
+    <string name="quick_no_link_message">En Instagram, toca Compartir → Copiar enlace y vuelve a tocar la burbuja.</string>
+    <string name="quick_error_title">Contenido no disponible</string>
+    <string name="quick_download_all">Descargar todo (%1$d)</string>
+    <string name="quick_open_app">Abrir en Instasave</string>
+
     <string name="disclaimer">Descarga solo contenido tuyo o que tengas permiso para usar.</string>
 </resources>

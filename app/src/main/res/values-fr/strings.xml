@@ -115,5 +115,21 @@
         <item quantity="other">Téléchargé il y a %d jours</item>
     </plurals>
 
+    <!-- Floating bubble -->
+    <string name="bubble_title">Bulle flottante</string>
+    <string name="bubble_summary">Téléchargez sans quitter Instagram : copiez le lien d\'une publication, puis touchez la bulle.</string>
+    <string name="bubble_description">Télécharger le lien copié</string>
+    <string name="bubble_notification_title">La bulle Instasave est active</string>
+    <string name="bubble_notification_text">Copiez le lien d\'une publication dans Instagram, puis touchez la bulle.</string>
+    <string name="bubble_notification_stop">Masquer la bulle</string>
+    <string name="bubble_permission_denied">Autorisez Instasave à s\'afficher par-dessus les autres applis pour utiliser la bulle.</string>
+
+    <!-- Quick download sheet -->
+    <string name="quick_no_link_title">Aucun lien copié</string>
+    <string name="quick_no_link_message">Dans Instagram, touchez Partager → Copier le lien, puis touchez à nouveau la bulle.</string>
+    <string name="quick_error_title">Contenu indisponible</string>
+    <string name="quick_download_all">Tout télécharger (%1$d)</string>
+    <string name="quick_open_app">Ouvrir dans Instasave</string>
+
     <string name="disclaimer">Ne téléchargez que des contenus qui vous appartiennent ou que vous avez le droit d\'utiliser.</string>
 </resources>
