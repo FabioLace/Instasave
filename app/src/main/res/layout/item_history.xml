@@ -25,7 +25,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_history_icon"
-                android:contentDescription="Download preview"
+                android:contentDescription="@string/history_item_preview"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
 
@@ -83,11 +83,11 @@
             android:layout_height="wrap_content"
             android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
-            android:contentDescription="Remove from history"
+            android:contentDescription="@string/history_remove_description"
             android:focusable="true"
             android:paddingHorizontal="6dp"
             android:paddingVertical="8dp"
-            android:text="Remove"
+            android:text="@string/history_remove"
             android:textColor="@color/accent_dark"
             android:textSize="13sp"
             android:textStyle="bold" />

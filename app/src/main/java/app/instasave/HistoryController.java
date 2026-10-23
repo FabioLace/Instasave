@@ -64,10 +64,10 @@ final class HistoryController {
         try {
             JSONArray history = repository.entries();
             boolean expanded = repository.isExpanded();
-            String countLabel = history.length() == 0 ? "No downloads"
-                    : history.length() == 1 ? "1 download" : history.length() + " downloads";
+            String countLabel = history.length() == 0 ? activity.getString(R.string.history_count_none)
+                    : quantity(R.plurals.history_count, history.length());
             historyToggle.setText(countLabel + "  " + (expanded ? "▲" : "▼"));
-            historyToggle.setContentDescription(expanded ? "Collapse download history" : "Expand download history");
+            historyToggle.setContentDescription(activity.getString(expanded ? R.string.history_collapse : R.string.history_expand));
             container.setVisibility(expanded ? View.VISIBLE : View.GONE);
             emptyHistory.setVisibility(expanded && history.length() == 0 ? View.VISIBLE : View.GONE);
             clearHistoryButton.setVisibility(expanded && history.length() > 0 ? View.VISIBLE : View.GONE);
@@ -95,20 +95,21 @@ final class HistoryController {
         String type = item.optString("type", "auto");
         JSONArray files = HistoryRepository.files(item);
         boolean isCarousel = "carousel".equals(type);
-        ((TextView) row.findViewById(R.id.itemIcon)).setText(type.equals("photo") ? "Photo" : type.equals("story") ? "Story" : type.equals("carousel") ? "Multi" : "Video");
-        ((TextView) row.findViewById(R.id.itemTitle)).setText(isCarousel ? "Instagram carousel" : "Instagram content");
+        ((TextView) row.findViewById(R.id.itemIcon)).setText(isCarousel ? R.string.type_multi : labelFor(type));
+        ((TextView) row.findViewById(R.id.itemTitle)).setText(isCarousel ? R.string.history_item_carousel : R.string.history_item_content);
         String downloadedAt = downloadAge(item.optLong("createdAt", 0L));
         ((TextView) row.findViewById(R.id.itemMeta)).setText(isCarousel
-                ? files.length() + (files.length() == 1 ? " file" : " files") + " · " + downloadedAt
-                : labelFor(type) + " · " + downloadedAt);
+                ? quantity(R.plurals.history_file_count, files.length()) + " · " + downloadedAt
+                : activity.getString(labelFor(type)) + " · " + downloadedAt);
         if (isCarousel && files.length() > 0) {
             expandIndicator.setVisibility(View.VISIBLE);
             addFiles(filesContainer, files);
-            itemHeader.setContentDescription("Expand downloaded carousel files");
+            itemHeader.setContentDescription(activity.getString(R.string.history_files_expand));
             itemHeader.setOnClickListener(v -> toggleFiles(itemHeader, filesContainer, expandIndicator));
         } else if (files.length() > 0) {
             JSONObject file = files.optJSONObject(0);
-            itemHeader.setContentDescription("Open downloaded " + type);
+            itemHeader.setContentDescription(activity.getString("photo".equals(type) ? R.string.history_open_photo
+                    : "story".equals(type) ? R.string.history_open_story : R.string.history_open_video));
             itemHeader.setOnClickListener(v -> openFile(file));
         }
         row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeItem(position));
@@ -123,10 +124,10 @@ final class HistoryController {
             if (file == null) continue;
             View child = LayoutInflater.from(activity).inflate(R.layout.item_history_file, filesContainer, false);
             String type = file.optString("type", "photo");
-            String name = file.optString("name", "Downloaded file");
+            String name = file.optString("name", activity.getString(R.string.history_file_fallback_name));
             ((TextView) child.findViewById(R.id.historyFileName)).setText(name);
-            ((TextView) child.findViewById(R.id.historyFileType)).setText("video".equals(type) ? "Video" : "Photo");
-            child.setContentDescription("Open " + name);
+            ((TextView) child.findViewById(R.id.historyFileType)).setText("video".equals(type) ? R.string.type_video : R.string.type_photo);
+            child.setContentDescription(activity.getString(R.string.history_open_file, name));
             child.setOnClickListener(v -> openFile(file));
             filesContainer.addView(child);
             updateFileAvailability(child, file);
@@ -138,7 +139,7 @@ final class HistoryController {
         files.setVisibility(expand ? View.VISIBLE : View.GONE);
         if (expand) UiMotion.reveal(files, 8, 0);
         indicator.setText(expand ? "▲" : "▼");
-        header.setContentDescription((expand ? "Collapse" : "Expand") + " downloaded carousel files");
+        header.setContentDescription(activity.getString(expand ? R.string.history_files_collapse : R.string.history_files_expand));
     }
 
     private void setExpanded(boolean expanded) {
@@ -148,10 +149,10 @@ final class HistoryController {
     }
 
     private void confirmClear() {
-        new AlertDialog.Builder(activity).setTitle("Clear history?")
-                .setMessage("Downloaded files will not be deleted.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Clear", (dialog, which) -> {
+        new AlertDialog.Builder(activity).setTitle(R.string.history_clear_title)
+                .setMessage(R.string.history_clear_message)
+                .setNegativeButton(R.string.history_clear_cancel, null)
+                .setPositiveButton(R.string.history_clear, (dialog, which) -> {
                     repository.clear();
                     render();
                     statusReporter.clear();
@@ -164,7 +165,7 @@ final class HistoryController {
             render();
             statusReporter.clear();
         } catch (Exception error) {
-            statusReporter.show("Unable to remove the item from history.", true);
+            statusReporter.show(activity.getString(R.string.history_remove_failed), true);
         }
     }
 
@@ -211,7 +212,7 @@ final class HistoryController {
                     type.setText("");
                     boolean isVideo = "video".equals(file.optString("type", "photo"));
                     type.setCompoundDrawablesWithIntrinsicBounds(isVideo ? R.drawable.ic_video : R.drawable.ic_photo, 0, 0, 0);
-                    type.setContentDescription(isVideo ? "Video file" : "Photo file");
+                    type.setContentDescription(activity.getString(isVideo ? R.string.history_file_video : R.string.history_file_photo));
                     return;
                 }
                 type.setCompoundDrawables(null, null, null, null);
@@ -246,13 +247,13 @@ final class HistoryController {
             Uri fileUri = findLocalFile(file);
             activity.runOnUiThread(() -> {
                 if (fileUri == null) {
-                    statusReporter.show("File not found. The download may still be finishing or the file was deleted.", true);
+                    statusReporter.show(activity.getString(R.string.history_file_missing), true);
                     return;
                 }
                 Intent viewFile = new Intent(Intent.ACTION_VIEW).setDataAndType(fileUri,
                         "video".equals(type) ? "video/*" : "image/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 try { activity.startActivity(viewFile); }
-                catch (Exception error) { statusReporter.show("No local viewer is available to open this file.", true); }
+                catch (Exception error) { statusReporter.show(activity.getString(R.string.history_no_viewer), true); }
             });
         });
     }
@@ -286,21 +287,24 @@ final class HistoryController {
 
     private int dp(int value) { return Math.round(value * activity.getResources().getDisplayMetrics().density); }
 
-    private static String downloadAge(long createdAt) {
-        if (createdAt <= 0L) return "Downloaded previously";
+    private String downloadAge(long createdAt) {
+        if (createdAt <= 0L) return activity.getString(R.string.downloaded_previously);
         long elapsedMinutes = Math.max(0L, System.currentTimeMillis() - createdAt) / 60_000L;
-        if (elapsedMinutes < 1L) return "Downloaded just now";
-        if (elapsedMinutes < 60L) return "Downloaded " + elapsedMinutes + (elapsedMinutes == 1L ? " min" : " mins") + " ago";
+        if (elapsedMinutes < 1L) return activity.getString(R.string.downloaded_just_now);
+        if (elapsedMinutes < 60L) return quantity(R.plurals.downloaded_minutes_ago, elapsedMinutes);
         long elapsedHours = elapsedMinutes / 60L;
-        if (elapsedHours < 24L) return "Downloaded " + elapsedHours + (elapsedHours == 1L ? " hour" : " hours") + " ago";
-        long elapsedDays = elapsedHours / 24L;
-        return "Downloaded " + elapsedDays + (elapsedDays == 1L ? " day" : " days") + " ago";
+        if (elapsedHours < 24L) return quantity(R.plurals.downloaded_hours_ago, elapsedHours);
+        return quantity(R.plurals.downloaded_days_ago, elapsedHours / 24L);
     }
 
-    private static String labelFor(String type) {
-        if ("photo".equals(type)) return "Photo";
-        if ("story".equals(type)) return "Story";
-        if ("carousel".equals(type)) return "Carousel";
-        return "Video";
+    private String quantity(int pluralRes, long count) {
+        return activity.getResources().getQuantityString(pluralRes, (int) count, count);
+    }
+
+    private static int labelFor(String type) {
+        if ("photo".equals(type)) return R.string.type_photo;
+        if ("story".equals(type)) return R.string.type_story;
+        if ("carousel".equals(type)) return R.string.type_carousel;
+        return R.string.type_video;
     }
 }

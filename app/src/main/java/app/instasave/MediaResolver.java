@@ -87,7 +87,7 @@ final class MediaResolver {
             return new Result(Collections.singletonList(item));
         }
         if (!isInstagramPermalink(sourceUrl)) {
-            throw new IllegalArgumentException("Paste a public Instagram permalink or a direct media URL.");
+            throw new UserFacingException(R.string.error_unsupported_link);
         }
 
         // Both the permalink and its public embed can expose media variants. Compare their
@@ -137,7 +137,7 @@ final class MediaResolver {
         // public embed exposes the post image and its responsive sources, including the largest one.
         String imageUrl = imageFromPublicEmbed(embedHtml);
         if (imageUrl == null) {
-            throw new IllegalStateException("Instagram did not expose downloadable media for this content.");
+            throw new UserFacingException(R.string.error_no_media);
         }
         String filename = "instasave_" + System.currentTimeMillis() + ".jpg";
         return new Result(Collections.singletonList(new MediaItem(imageUrl, filename, "photo", imageUrl)));
@@ -149,7 +149,7 @@ final class MediaResolver {
         } catch (ExecutionException error) {
             Throwable cause = error.getCause();
             if (cause instanceof Exception) throw (Exception) cause;
-            throw new IllegalStateException("Unable to read this public content.", cause);
+            throw new UserFacingException(R.string.error_unreadable, cause);
         }
     }
 
@@ -162,7 +162,7 @@ final class MediaResolver {
         connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
         connection.setRequestProperty("Accept", "text/html,application/xhtml+xml");
         if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-            throw new IllegalStateException("This public content is unavailable.");
+            throw new UserFacingException(R.string.error_unavailable);
         }
         StringBuilder body = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {

@@ -1,0 +1,119 @@
+<resources>
+    <!-- Link input -->
+    <string name="link_title">Paste the link</string>
+    <string name="link_clear">Clear link</string>
+    <string name="link_paste">Paste link from clipboard</string>
+    <string name="link_analyze">Find content</string>
+
+    <!-- Status messages -->
+    <string name="status_link_received">Instagram link received. Ready to analyze.</string>
+    <string name="status_link_pasted">Link pasted. Ready to analyze.</string>
+    <string name="status_clipboard_empty">Clipboard is empty.</string>
+    <string name="status_clipboard_invalid">Clipboard doesn\'t contain a valid link.</string>
+    <string name="status_analyzing">Analyzing content...</string>
+    <string name="status_content_ready">Content ready to download.</string>
+    <string name="status_select_item">Select at least one item to download.</string>
+    <string name="status_download_started">Download started. Find it in notifications.</string>
+    <string name="status_downloads_started">Downloads started. Find them in notifications.</string>
+    <string name="status_download_completed">Download completed. The file is in Download/Instasave.</string>
+    <string name="status_downloads_failed">One or more downloads could not be completed.</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Unable to process this public content.</string>
+    <string name="error_unsupported_link">Paste a public Instagram permalink or a direct media URL.</string>
+    <string name="error_no_media">Instagram did not expose downloadable media for this content.</string>
+    <string name="error_unreadable">Unable to read this public content.</string>
+    <string name="error_unavailable">This public content is unavailable.</string>
+    <string name="error_invalid_image">The received file is not a valid image.</string>
+    <string name="error_jpeg_unsupported">Saving as JPEG requires Android 10 or later.</string>
+    <string name="error_jpeg_create">Unable to create the JPEG file.</string>
+    <string name="error_jpeg_convert">Unable to convert the image to JPEG.</string>
+
+    <!-- Media types -->
+    <string name="type_photo">Photo</string>
+    <string name="type_video">Video</string>
+    <string name="type_story">Story</string>
+    <string name="type_carousel">Carousel</string>
+    <string name="type_multi">Multi</string>
+
+    <!-- Preview -->
+    <string name="preview_image">Content preview</string>
+    <string name="preview_photo_ready">Photo ready</string>
+    <string name="preview_video_ready">Video ready</string>
+    <string name="preview_carousel_ready">Carousel ready</string>
+    <string name="preview_photo_source">Image from the public post</string>
+    <string name="preview_video_source">Preview from the public post</string>
+    <string name="preview_items_source">%1$d items from the public post</string>
+    <string name="preview_source_mb">Source %1$.1f MB</string>
+    <string name="preview_source_kb">Source %1$.0f KB</string>
+    <string name="preview_source_bytes">Source %1$d B</string>
+    <string name="preview_choose_items">Choose items to download</string>
+    <string name="preview_item_thumbnail">Item preview %1$d</string>
+    <string name="preview_select_item">Select item %1$d</string>
+
+    <!-- Download button -->
+    <string name="download_action">Download</string>
+    <string name="download_selected">Download %1$d selected</string>
+    <string name="download_select_items">Select items</string>
+    <string name="download_started">Download started</string>
+    <string name="download_completed">Download completed</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_notification">Saving to Download/Instasave</string>
+
+    <!-- History -->
+    <string name="history_title">RECENT</string>
+    <string name="history_expand">Expand download history</string>
+    <string name="history_collapse">Collapse download history</string>
+    <string name="history_count_none">No downloads</string>
+    <plurals name="history_count">
+        <item quantity="one">%d download</item>
+        <item quantity="other">%d downloads</item>
+    </plurals>
+    <string name="history_empty">No downloads yet\nYour first one will appear here.</string>
+    <string name="history_clear">Clear</string>
+    <string name="history_clear_description">Clear download history</string>
+    <string name="history_clear_title">Clear history?</string>
+    <string name="history_clear_message">Downloaded files will not be deleted.</string>
+    <string name="history_clear_cancel">Cancel</string>
+    <string name="history_remove">Remove</string>
+    <string name="history_remove_description">Remove from history</string>
+    <string name="history_remove_failed">Unable to remove the item from history.</string>
+
+    <!-- History items -->
+    <string name="history_item_preview">Download preview</string>
+    <string name="history_item_content">Instagram content</string>
+    <string name="history_item_carousel">Instagram carousel</string>
+    <plurals name="history_file_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <string name="history_open_photo">Open downloaded photo</string>
+    <string name="history_open_video">Open downloaded video</string>
+    <string name="history_open_story">Open downloaded story</string>
+    <string name="history_open_file">Open %1$s</string>
+    <string name="history_files_expand">Expand downloaded carousel files</string>
+    <string name="history_files_collapse">Collapse downloaded carousel files</string>
+    <string name="history_file_fallback_name">Downloaded file</string>
+    <string name="history_file_photo">Photo file</string>
+    <string name="history_file_video">Video file</string>
+    <string name="history_file_missing">File not found. The download may still be finishing or the file was deleted.</string>
+    <string name="history_no_viewer">No local viewer is available to open this file.</string>
+
+    <!-- Download age -->
+    <string name="downloaded_previously">Downloaded previously</string>
+    <string name="downloaded_just_now">Downloaded just now</string>
+    <plurals name="downloaded_minutes_ago">
+        <item quantity="one">Downloaded %d min ago</item>
+        <item quantity="other">Downloaded %d mins ago</item>
+    </plurals>
+    <plurals name="downloaded_hours_ago">
+        <item quantity="one">Downloaded %d hour ago</item>
+        <item quantity="other">Downloaded %d hours ago</item>
+    </plurals>
+    <plurals name="downloaded_days_ago">
+        <item quantity="one">Downloaded %d day ago</item>
+        <item quantity="other">Downloaded %d days ago</item>
+    </plurals>
+
+    <string name="disclaimer">Download only content you own or have permission to use.</string>
+</resources>

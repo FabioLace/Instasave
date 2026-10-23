@@ -61,7 +61,7 @@ final class DownloadController {
         }
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(item.downloadUrl));
         request.setTitle(item.filename);
-        request.setDescription("Saving to Download/Instasave");
+        request.setDescription(activity.getString(R.string.download_notification));
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Instasave/" + item.filename);
         try {
@@ -79,17 +79,17 @@ final class DownloadController {
             Uri destination = null;
             try {
                 Bitmap image = ImageLoader.fetchOriginal(item.downloadUrl);
-                if (image == null) throw new IllegalStateException("The received file is not a valid image.");
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) throw new IllegalStateException("Saving as JPEG requires Android 10 or later.");
+                if (image == null) throw new IllegalStateException(activity.getString(R.string.error_invalid_image));
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) throw new IllegalStateException(activity.getString(R.string.error_jpeg_unsupported));
                 ContentValues values = new ContentValues();
                 values.put(MediaStore.MediaColumns.DISPLAY_NAME, jpegFilename(item.filename));
                 values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
                 values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Instasave");
                 values.put(MediaStore.MediaColumns.IS_PENDING, 1);
                 destination = activity.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-                if (destination == null) throw new IllegalStateException("Unable to create the JPEG file.");
+                if (destination == null) throw new IllegalStateException(activity.getString(R.string.error_jpeg_create));
                 try (java.io.OutputStream output = activity.getContentResolver().openOutputStream(destination)) {
-                    if (output == null || !image.compress(Bitmap.CompressFormat.JPEG, 100, output)) throw new IllegalStateException("Unable to convert the image to JPEG.");
+                    if (output == null || !image.compress(Bitmap.CompressFormat.JPEG, 100, output)) throw new IllegalStateException(activity.getString(R.string.error_jpeg_convert));
                 }
                 values.clear();
                 values.put(MediaStore.MediaColumns.IS_PENDING, 0);
@@ -122,8 +122,8 @@ final class DownloadController {
         return (dot > 0 ? filename.substring(0, dot) : filename) + ".jpg";
     }
 
-    private static String errorMessage(Exception error) {
+    private String errorMessage(Exception error) {
         String message = error.getMessage();
-        return message == null || message.trim().isEmpty() ? "Unable to process this public content." : message;
+        return message == null || message.trim().isEmpty() ? activity.getString(R.string.error_generic) : message;
     }
 }

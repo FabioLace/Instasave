@@ -1,0 +1,119 @@
+<resources>
+    <!-- Link input -->
+    <string name="link_title">Incolla il link</string>
+    <string name="link_clear">Cancella il link</string>
+    <string name="link_paste">Incolla il link dagli appunti</string>
+    <string name="link_analyze">Trova contenuto</string>
+
+    <!-- Status messages -->
+    <string name="status_link_received">Link Instagram ricevuto. Pronto per l\'analisi.</string>
+    <string name="status_link_pasted">Link incollato. Pronto per l\'analisi.</string>
+    <string name="status_clipboard_empty">Gli appunti sono vuoti.</string>
+    <string name="status_clipboard_invalid">Gli appunti non contengono un link valido.</string>
+    <string name="status_analyzing">Analisi del contenuto in corso...</string>
+    <string name="status_content_ready">Contenuto pronto per il download.</string>
+    <string name="status_select_item">Seleziona almeno un elemento da scaricare.</string>
+    <string name="status_download_started">Download avviato. Lo trovi nelle notifiche.</string>
+    <string name="status_downloads_started">Download avviati. Li trovi nelle notifiche.</string>
+    <string name="status_download_completed">Download completato. Il file è in Download/Instasave.</string>
+    <string name="status_downloads_failed">Non è stato possibile completare uno o più download.</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Impossibile elaborare questo contenuto pubblico.</string>
+    <string name="error_unsupported_link">Incolla il link di un contenuto Instagram pubblico o l\'URL diretto di un file multimediale.</string>
+    <string name="error_no_media">Instagram non ha reso disponibili file scaricabili per questo contenuto.</string>
+    <string name="error_unreadable">Impossibile leggere questo contenuto pubblico.</string>
+    <string name="error_unavailable">Questo contenuto pubblico non è disponibile.</string>
+    <string name="error_invalid_image">Il file ricevuto non è un\'immagine valida.</string>
+    <string name="error_jpeg_unsupported">Il salvataggio in JPEG richiede Android 10 o versioni successive.</string>
+    <string name="error_jpeg_create">Impossibile creare il file JPEG.</string>
+    <string name="error_jpeg_convert">Impossibile convertire l\'immagine in JPEG.</string>
+
+    <!-- Media types -->
+    <string name="type_photo">Foto</string>
+    <string name="type_video">Video</string>
+    <string name="type_story">Storia</string>
+    <string name="type_carousel">Carosello</string>
+    <string name="type_multi">Multi</string>
+
+    <!-- Preview -->
+    <string name="preview_image">Anteprima del contenuto</string>
+    <string name="preview_photo_ready">Foto pronta</string>
+    <string name="preview_video_ready">Video pronto</string>
+    <string name="preview_carousel_ready">Carosello pronto</string>
+    <string name="preview_photo_source">Immagine dal post pubblico</string>
+    <string name="preview_video_source">Anteprima dal post pubblico</string>
+    <string name="preview_items_source">%1$d elementi dal post pubblico</string>
+    <string name="preview_source_mb">Originale %1$.1f MB</string>
+    <string name="preview_source_kb">Originale %1$.0f KB</string>
+    <string name="preview_source_bytes">Originale %1$d B</string>
+    <string name="preview_choose_items">Scegli gli elementi da scaricare</string>
+    <string name="preview_item_thumbnail">Anteprima elemento %1$d</string>
+    <string name="preview_select_item">Seleziona elemento %1$d</string>
+
+    <!-- Download button -->
+    <string name="download_action">Scarica</string>
+    <string name="download_selected">Scarica %1$d selezionati</string>
+    <string name="download_select_items">Seleziona elementi</string>
+    <string name="download_started">Download avviato</string>
+    <string name="download_completed">Download completato</string>
+    <string name="download_failed">Download non riuscito</string>
+    <string name="download_notification">Salvataggio in Download/Instasave</string>
+
+    <!-- History -->
+    <string name="history_title">RECENTI</string>
+    <string name="history_expand">Espandi la cronologia dei download</string>
+    <string name="history_collapse">Comprimi la cronologia dei download</string>
+    <string name="history_count_none">Nessun download</string>
+    <plurals name="history_count">
+        <item quantity="one">%d download</item>
+        <item quantity="other">%d download</item>
+    </plurals>
+    <string name="history_empty">Ancora nessun download\nIl primo comparirà qui.</string>
+    <string name="history_clear">Cancella</string>
+    <string name="history_clear_description">Cancella la cronologia dei download</string>
+    <string name="history_clear_title">Cancellare la cronologia?</string>
+    <string name="history_clear_message">I file scaricati non verranno eliminati.</string>
+    <string name="history_clear_cancel">Annulla</string>
+    <string name="history_remove">Rimuovi</string>
+    <string name="history_remove_description">Rimuovi dalla cronologia</string>
+    <string name="history_remove_failed">Impossibile rimuovere l\'elemento dalla cronologia.</string>
+
+    <!-- History items -->
+    <string name="history_item_preview">Anteprima del download</string>
+    <string name="history_item_content">Contenuto Instagram</string>
+    <string name="history_item_carousel">Carosello Instagram</string>
+    <plurals name="history_file_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d file</item>
+    </plurals>
+    <string name="history_open_photo">Apri la foto scaricata</string>
+    <string name="history_open_video">Apri il video scaricato</string>
+    <string name="history_open_story">Apri la storia scaricata</string>
+    <string name="history_open_file">Apri %1$s</string>
+    <string name="history_files_expand">Espandi i file del carosello scaricato</string>
+    <string name="history_files_collapse">Comprimi i file del carosello scaricato</string>
+    <string name="history_file_fallback_name">File scaricato</string>
+    <string name="history_file_photo">File foto</string>
+    <string name="history_file_video">File video</string>
+    <string name="history_file_missing">File non trovato. Il download potrebbe essere ancora in corso oppure il file è stato eliminato.</string>
+    <string name="history_no_viewer">Nessuna app disponibile per aprire questo file.</string>
+
+    <!-- Download age -->
+    <string name="downloaded_previously">Scaricato in precedenza</string>
+    <string name="downloaded_just_now">Scaricato adesso</string>
+    <plurals name="downloaded_minutes_ago">
+        <item quantity="one">Scaricato %d min fa</item>
+        <item quantity="other">Scaricato %d min fa</item>
+    </plurals>
+    <plurals name="downloaded_hours_ago">
+        <item quantity="one">Scaricato %d ora fa</item>
+        <item quantity="other">Scaricato %d ore fa</item>
+    </plurals>
+    <plurals name="downloaded_days_ago">
+        <item quantity="one">Scaricato %d giorno fa</item>
+        <item quantity="other">Scaricato %d giorni fa</item>
+    </plurals>
+
+    <string name="disclaimer">Scarica solo contenuti tuoi o che hai il permesso di usare.</string>
+</resources>
