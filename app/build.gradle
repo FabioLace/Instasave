@@ -1,5 +1,9 @@
 apply plugin: 'com.android.application'
 
+base {
+    archivesName = 'instasave'
+}
+
 android {
     namespace 'app.instasave'
     compileSdk 34

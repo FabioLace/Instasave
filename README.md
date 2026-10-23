@@ -58,7 +58,7 @@ From the project root:
 The APK is generated at:
 
 ```text
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/debug/instasave-debug.apk
 ```
 
 To use only dependencies already available in the local cache:
@@ -86,7 +86,7 @@ The script uses `ANDROID_SDK_ROOT`/`ANDROID_HOME` when set, otherwise `~/Android
 With an Android device connected and ADB available:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/instasave-debug.apk
 adb shell monkey -p app.instasave 1
 ```
 
