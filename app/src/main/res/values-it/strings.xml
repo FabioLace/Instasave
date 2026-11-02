@@ -22,6 +22,7 @@
     <string name="error_generic">Impossibile elaborare questo contenuto pubblico.</string>
     <string name="error_unsupported_link">Incolla il link di un contenuto Instagram pubblico o l\'URL diretto di un file multimediale.</string>
     <string name="error_no_media">Instagram non ha reso disponibili file scaricabili per questo contenuto.</string>
+    <string name="error_video_unavailable">Al momento Instagram non ha inviato il video di questo contenuto. Riprova tra qualche minuto.</string>
     <string name="error_unreadable">Impossibile leggere questo contenuto pubblico.</string>
     <string name="error_unavailable">Questo contenuto pubblico non è disponibile.</string>
     <string name="error_invalid_image">Il file ricevuto non è un\'immagine valida.</string>

@@ -22,6 +22,7 @@
     <string name="error_generic">Unable to process this public content.</string>
     <string name="error_unsupported_link">Paste a public Instagram permalink or a direct media URL.</string>
     <string name="error_no_media">Instagram did not expose downloadable media for this content.</string>
+    <string name="error_video_unavailable">Instagram did not send the video for this content right now. Try again in a few minutes.</string>
     <string name="error_unreadable">Unable to read this public content.</string>
     <string name="error_unavailable">This public content is unavailable.</string>
     <string name="error_invalid_image">The received file is not a valid image.</string>

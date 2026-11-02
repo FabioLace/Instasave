@@ -22,6 +22,7 @@
     <string name="error_generic">Impossible de traiter ce contenu public.</string>
     <string name="error_unsupported_link">Collez le lien d\'une publication Instagram publique ou l\'URL directe d\'un fichier multimédia.</string>
     <string name="error_no_media">Instagram n\'a fourni aucun média téléchargeable pour ce contenu.</string>
+    <string name="error_video_unavailable">Instagram n\'a pas fourni la vidéo de ce contenu pour le moment. Réessayez dans quelques minutes.</string>
     <string name="error_unreadable">Impossible de lire ce contenu public.</string>
     <string name="error_unavailable">Ce contenu public n\'est pas disponible.</string>
     <string name="error_invalid_image">Le fichier reçu n\'est pas une image valide.</string>

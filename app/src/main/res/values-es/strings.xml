@@ -22,6 +22,7 @@
     <string name="error_generic">No se pudo procesar este contenido público.</string>
     <string name="error_unsupported_link">Pega el enlace de una publicación pública de Instagram o la URL directa de un archivo multimedia.</string>
     <string name="error_no_media">Instagram no ofrece archivos descargables para este contenido.</string>
+    <string name="error_video_unavailable">Instagram no ha enviado el vídeo de este contenido en este momento. Inténtalo de nuevo en unos minutos.</string>
     <string name="error_unreadable">No se pudo leer este contenido público.</string>
     <string name="error_unavailable">Este contenido público no está disponible.</string>
     <string name="error_invalid_image">El archivo recibido no es una imagen válida.</string>
