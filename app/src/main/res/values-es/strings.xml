@@ -22,6 +22,7 @@
     <string name="error_generic">No se pudo procesar este contenido público.</string>
     <string name="error_unsupported_link">Pega el enlace de una publicación pública de Instagram o la URL directa de un archivo multimedia.</string>
     <string name="error_no_media">Instagram no ofrece archivos descargables para este contenido.</string>
+    <string name="error_video_unavailable">Instagram no ha enviado el vídeo de este contenido en este momento. Inténtalo de nuevo en unos minutos.</string>
     <string name="error_unreadable">No se pudo leer este contenido público.</string>
     <string name="error_unavailable">Este contenido público no está disponible.</string>
     <string name="error_invalid_image">El archivo recibido no es una imagen válida.</string>
@@ -44,6 +45,7 @@
     <string name="preview_photo_source">Imagen de la publicación pública</string>
     <string name="preview_video_source">Vista previa de la publicación pública</string>
     <string name="preview_items_source">%1$d elementos de la publicación pública</string>
+    <string name="preview_items_by">%1$d elementos de @%2$s</string>
     <string name="preview_source_mb">Original %1$.1f MB</string>
     <string name="preview_source_kb">Original %1$.0f KB</string>
     <string name="preview_source_bytes">Original %1$d B</string>
@@ -91,6 +93,8 @@
     <string name="history_open_video">Abrir el video descargado</string>
     <string name="history_open_story">Abrir la historia descargada</string>
     <string name="history_open_file">Abrir %1$s</string>
+    <string name="history_open_post">Abrir la publicación original en Instagram</string>
+    <string name="history_open_post_failed">Ninguna aplicación puede abrir este enlace de Instagram.</string>
     <string name="history_files_expand">Mostrar los archivos del carrusel descargado</string>
     <string name="history_files_collapse">Ocultar los archivos del carrusel descargado</string>
     <string name="history_file_fallback_name">Archivo descargado</string>
@@ -114,6 +118,22 @@
         <item quantity="one">Descargado hace %d día</item>
         <item quantity="other">Descargado hace %d días</item>
     </plurals>
+
+    <!-- Floating bubble -->
+    <string name="bubble_title">Burbuja flotante</string>
+    <string name="bubble_summary">Descarga sin salir de Instagram: copia el enlace de una publicación y toca la burbuja.</string>
+    <string name="bubble_description">Descargar el enlace copiado</string>
+    <string name="bubble_notification_title">La burbuja de Instasave está activa</string>
+    <string name="bubble_notification_text">Copia el enlace de una publicación en Instagram y toca la burbuja.</string>
+    <string name="bubble_notification_stop">Ocultar burbuja</string>
+    <string name="bubble_permission_denied">Permite que Instasave se muestre sobre otras apps para usar la burbuja.</string>
+
+    <!-- Quick download sheet -->
+    <string name="quick_no_link_title">Ningún enlace copiado</string>
+    <string name="quick_no_link_message">En Instagram, toca Compartir → Copiar enlace y vuelve a tocar la burbuja.</string>
+    <string name="quick_error_title">Contenido no disponible</string>
+    <string name="quick_download_all">Descargar todo (%1$d)</string>
+    <string name="quick_open_app">Abrir en Instasave</string>
 
     <string name="disclaimer">Descarga solo contenido tuyo o que tengas permiso para usar.</string>
 </resources>

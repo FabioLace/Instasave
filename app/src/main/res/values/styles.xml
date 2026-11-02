@@ -8,4 +8,14 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+
+    <!-- Sheet shown over Instagram: the app behind stays visible under a scrim. -->
+    <style name="Theme.Instasave.QuickDownload">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Translucent</item>
+        <item name="android:statusBarColor">@color/scrim</item>
+        <item name="android:navigationBarColor">@color/scrim</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

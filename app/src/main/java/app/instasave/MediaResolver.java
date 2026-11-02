@@ -37,6 +37,9 @@ final class MediaResolver {
     private static final Pattern HTML_ATTRIBUTE = Pattern.compile(
             "\\b%s=[\\\"'](.*?)[\\\"']", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern SRCSET_ENTRY = Pattern.compile("(.+?)\\s+(\\d+)w");
+    private static final Pattern MEDIA_PK = Pattern.compile("\\d+");
+    private static final Pattern EMBED_USERNAME = Pattern.compile(
+            "class=[\\\"']UsernameText[\\\"'][^>]*>([^<]+)<", Pattern.CASE_INSENSITIVE);
 
     static final class MediaItem {
         final String downloadUrl;
@@ -49,6 +52,8 @@ final class MediaResolver {
         volatile int height;
         double durationSeconds;
         volatile long sourceSizeBytes = -1;
+        /** The post declares this item as a video, but the response only carried its cover. */
+        boolean videoMissing;
 
         MediaItem(String downloadUrl, String filename, String type, String previewUrl) {
             this(downloadUrl, filename, type, previewUrl, 0, 0, 0, null);
@@ -71,10 +76,15 @@ final class MediaResolver {
     static final class Result {
         final List<MediaItem> items;
         final String type;
+        /** The post author's username, or null when the response didn't expose it. */
+        final String username;
 
-        Result(List<MediaItem> items) {
+        Result(List<MediaItem> items) { this(items, null); }
+
+        Result(List<MediaItem> items, String username) {
             this.items = items;
             this.type = items.size() > 1 ? "carousel" : items.get(0).type;
+            this.username = username;
         }
     }
 
@@ -107,6 +117,34 @@ final class MediaResolver {
             requests.shutdownNow();
         }
 
+        // Reels and IGTV links are always videos. Other posts reveal it through their data.
+        boolean videoExpected = isVideoPermalink(sourceUrl);
+        Result result = null;
+        for (int attempt = 0; ; attempt++) {
+            result = resultFrom(html, embedHtml, shortcode, videoExpected);
+            if (result != null && !lacksVideo(result, videoExpected)) return result;
+            // Instagram intermittently serves logged-out visitors a permalink page without the
+            // media node (only the embed is left, and for videos it only has the cover). Those
+            // responses are transient, so ask for the page again before giving up.
+            if (attempt >= PAGE_RETRIES) break;
+            Thread.sleep(RETRY_DELAY_MS * (attempt + 1));
+            try {
+                html = fetchHtml(sourceUrl);
+            } catch (Exception ignored) {
+                // Keep the previous response and its partial data for the next attempt.
+            }
+        }
+        if (result == null) throw new UserFacingException(R.string.error_no_media);
+        // Saving the cover as a photo is what users perceived as "random images instead of
+        // reels". Report the missing video instead, so a later attempt can fetch the real file.
+        throw new UserFacingException(R.string.error_video_unavailable);
+    }
+
+    private static final int PAGE_RETRIES = 2;
+    private static final long RETRY_DELAY_MS = 700;
+
+    /** Builds the best result from one page/embed pair, or null if neither exposes any media. */
+    private static Result resultFrom(String html, String embedHtml, String shortcode, boolean videoExpected) {
         JSONObject mediaNode = findMediaNode(html, shortcode);
         List<MediaItem> pageItems = Collections.emptyList();
         if (mediaNode != null) {
@@ -117,30 +155,75 @@ final class MediaResolver {
         // stored as a string inside the embed bootstrap response, so it needs the extra pass in
         // searchForMediaNode() below.
         List<MediaItem> embedItems = Collections.emptyList();
-        if (embedHtml != null) {
-            JSONObject embedMediaNode = findMediaNode(embedHtml, shortcode);
-            if (embedMediaNode != null) {
-                embedItems = mediaItemsFrom(embedMediaNode);
-            }
+        JSONObject embedMediaNode = embedHtml == null ? null : findMediaNode(embedHtml, shortcode);
+        if (embedMediaNode != null) {
+            embedItems = mediaItemsFrom(embedMediaNode);
         }
+        String username = usernameOf(mediaNode);
+        if (username == null) username = usernameOf(embedMediaNode);
+        if (username == null) username = usernameFromPublicEmbed(embedHtml);
         List<MediaItem> items = bestAvailableItems(pageItems, embedItems);
-        if (!items.isEmpty()) return new Result(items);
+        boolean singleCoverOnly = items.size() == 1 && items.get(0).videoMissing;
+        if (!items.isEmpty() && !singleCoverOnly) return new Result(items, username);
 
+        // A single video whose data only carried the cover may still be in the og: tags.
         String videoUrl = openGraphContent(html, "og:video:secure_url");
         if (videoUrl == null) videoUrl = openGraphContent(html, "og:video");
         if (videoUrl != null) {
             String filename = "instasave_" + System.currentTimeMillis() + extensionFor(videoUrl, ".mp4");
-            return new Result(Collections.singletonList(new MediaItem(videoUrl, filename, "video", null)));
+            String previewUrl = singleCoverOnly ? items.get(0).previewUrl : null;
+            return new Result(Collections.singletonList(new MediaItem(videoUrl, filename, "video", previewUrl)),
+                    username);
         }
+        if (singleCoverOnly) return new Result(items, username);
 
         // The permalink page exposes og:image only as a small, often cropped preview. Instagram's
         // public embed exposes the post image and its responsive sources, including the largest one.
         String imageUrl = imageFromPublicEmbed(embedHtml);
-        if (imageUrl == null) {
-            throw new UserFacingException(R.string.error_no_media);
-        }
+        if (imageUrl == null) return null;
         String filename = "instasave_" + System.currentTimeMillis() + ".jpg";
-        return new Result(Collections.singletonList(new MediaItem(imageUrl, filename, "photo", imageUrl)));
+        MediaItem cover = new MediaItem(imageUrl, filename, "photo", imageUrl);
+        // The embed image of a reel is its cover, never the content the user asked for.
+        cover.videoMissing = videoExpected || (embedHtml != null && embedDeclaresVideo(embedHtml));
+        return new Result(Collections.singletonList(cover), username);
+    }
+
+    /** The permalink page nests the author under "user", the embed and GraphQL under "owner". */
+    private static String usernameOf(JSONObject mediaNode) {
+        if (mediaNode == null) return null;
+        for (String key : new String[] {"user", "owner"}) {
+            JSONObject author = mediaNode.optJSONObject(key);
+            String username = author == null ? null : nonEmpty(author.optString("username", null));
+            if (username != null) return username;
+        }
+        return null;
+    }
+
+    private static String usernameFromPublicEmbed(String html) {
+        if (html == null) return null;
+        Matcher match = EMBED_USERNAME.matcher(html);
+        return match.find() ? nonEmpty(match.group(1).trim()) : null;
+    }
+
+    private static boolean lacksVideo(Result result, boolean videoExpected) {
+        for (MediaItem item : result.items) {
+            if (item.videoMissing) return true;
+        }
+        return videoExpected && result.items.size() == 1 && !"video".equals(result.items.get(0).type);
+    }
+
+    private static boolean embedDeclaresVideo(String embedHtml) {
+        return embedHtml.contains("\\\"is_video\\\":true") || embedHtml.contains("\"is_video\":true");
+    }
+
+    private static boolean isVideoPermalink(String url) {
+        try {
+            String path = new URI(url).getPath();
+            return path != null && (path.startsWith("/reel/") || path.startsWith("/reels/")
+                    || path.startsWith("/tv/"));
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static String getPage(Future<String> request) throws Exception {
@@ -315,7 +398,11 @@ final class MediaResolver {
             }
             if (match == null && primary.size() == alternate.size()) {
                 MediaItem candidate = alternate.get(i);
-                if (item.sourceId == null || candidate.sourceId == null) match = candidate;
+                // A single-media post has exactly one item per response: they are the same media
+                // even if one response used an ID shape mediaIdOf() doesn't know yet.
+                if (primary.size() == 1 || item.sourceId == null || candidate.sourceId == null) {
+                    match = candidate;
+                }
             }
             if (match == null) {
                 selected.add(item);
@@ -350,12 +437,38 @@ final class MediaResolver {
         String type = isVideo ? "video" : "photo";
         String filename = "instasave_" + System.currentTimeMillis() + "_" + index
                 + (type.equals("video") ? extensionFor(url, ".mp4") : ".jpg");
-        String sourceId = nonEmpty(node.optString("id", null));
-        if (sourceId == null) sourceId = nonEmpty(node.optString("pk", null));
+        String sourceId = mediaIdOf(node);
         double duration = isVideo ? node.optDouble("video_duration", node.optDouble("duration", 0)) : 0;
-        items.add(new MediaItem(url, filename, type, displayUrl,
+        MediaItem item = new MediaItem(url, filename, type, displayUrl,
                 isVideo ? video.width : display.width, isVideo ? video.height : display.height,
-                duration, sourceId));
+                duration, sourceId);
+        // The public embed marks reels with is_video but never includes the video URL, and the
+        // permalink page omits the media node whenever Instagram gates logged-out traffic.
+        // Remember that only the cover arrived, so resolve() never saves it in place of the video.
+        item.videoMissing = !isVideo && declaresVideo(node);
+        items.add(item);
+    }
+
+    /**
+     * The same media carries differently shaped IDs per response: the permalink page uses
+     * "POLARIS_<pk>", the embed "<pk>" and some payloads "<pk>_<ownerId>". Reduce them all to
+     * the numeric pk, otherwise the page's video and the embed's cover never match and the
+     * cover wins.
+     */
+    private static String mediaIdOf(JSONObject node) {
+        String id = nonEmpty(node.optString("pk", null));
+        if (id == null) id = nonEmpty(node.optString("id", null));
+        if (id == null) return null;
+        Matcher digits = MEDIA_PK.matcher(id);
+        return digits.find() ? digits.group() : id;
+    }
+
+    private static boolean declaresVideo(JSONObject node) {
+        String typename = node.optString("__typename", "");
+        String productType = node.optString("product_type", "");
+        return node.optBoolean("is_video", false) || node.optInt("media_type", 0) == 2
+                || typename.endsWith("GraphVideo") || "clips".equals(productType)
+                || "igtv".equals(productType);
     }
 
     private static String publicEmbedHtml(String sourceUrl, String shortcode) {
@@ -459,7 +572,8 @@ final class MediaResolver {
         try {
             String[] segments = new URI(url).getPath().split("/");
             for (int i = 0; i + 1 < segments.length; i++) {
-                if ("p".equals(segments[i]) || "reel".equals(segments[i]) || "tv".equals(segments[i])) {
+                if ("p".equals(segments[i]) || "reel".equals(segments[i]) || "reels".equals(segments[i])
+                        || "tv".equals(segments[i])) {
                     return nonEmpty(segments[i + 1]);
                 }
             }

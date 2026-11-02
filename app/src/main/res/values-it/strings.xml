@@ -22,6 +22,7 @@
     <string name="error_generic">Impossibile elaborare questo contenuto pubblico.</string>
     <string name="error_unsupported_link">Incolla il link di un contenuto Instagram pubblico o l\'URL diretto di un file multimediale.</string>
     <string name="error_no_media">Instagram non ha reso disponibili file scaricabili per questo contenuto.</string>
+    <string name="error_video_unavailable">Al momento Instagram non ha inviato il video di questo contenuto. Riprova tra qualche minuto.</string>
     <string name="error_unreadable">Impossibile leggere questo contenuto pubblico.</string>
     <string name="error_unavailable">Questo contenuto pubblico non è disponibile.</string>
     <string name="error_invalid_image">Il file ricevuto non è un\'immagine valida.</string>
@@ -44,6 +45,7 @@
     <string name="preview_photo_source">Immagine dal post pubblico</string>
     <string name="preview_video_source">Anteprima dal post pubblico</string>
     <string name="preview_items_source">%1$d elementi dal post pubblico</string>
+    <string name="preview_items_by">%1$d elementi di @%2$s</string>
     <string name="preview_source_mb">Originale %1$.1f MB</string>
     <string name="preview_source_kb">Originale %1$.0f KB</string>
     <string name="preview_source_bytes">Originale %1$d B</string>
@@ -91,6 +93,8 @@
     <string name="history_open_video">Apri il video scaricato</string>
     <string name="history_open_story">Apri la storia scaricata</string>
     <string name="history_open_file">Apri %1$s</string>
+    <string name="history_open_post">Apri il post originale su Instagram</string>
+    <string name="history_open_post_failed">Nessuna app può aprire questo link di Instagram.</string>
     <string name="history_files_expand">Espandi i file del carosello scaricato</string>
     <string name="history_files_collapse">Comprimi i file del carosello scaricato</string>
     <string name="history_file_fallback_name">File scaricato</string>
@@ -114,6 +118,22 @@
         <item quantity="one">Scaricato %d giorno fa</item>
         <item quantity="other">Scaricato %d giorni fa</item>
     </plurals>
+
+    <!-- Floating bubble -->
+    <string name="bubble_title">Bolla fluttuante</string>
+    <string name="bubble_summary">Scarica senza uscire da Instagram: copia il link di un post, poi tocca la bolla.</string>
+    <string name="bubble_description">Scarica il link copiato</string>
+    <string name="bubble_notification_title">La bolla di Instasave è attiva</string>
+    <string name="bubble_notification_text">Copia il link di un post su Instagram, poi tocca la bolla.</string>
+    <string name="bubble_notification_stop">Nascondi bolla</string>
+    <string name="bubble_permission_denied">Consenti a Instasave di apparire sopra le altre app per usare la bolla.</string>
+
+    <!-- Quick download sheet -->
+    <string name="quick_no_link_title">Nessun link copiato</string>
+    <string name="quick_no_link_message">Su Instagram tocca Condividi → Copia link, poi tocca di nuovo la bolla.</string>
+    <string name="quick_error_title">Contenuto non disponibile</string>
+    <string name="quick_download_all">Scarica tutto (%1$d)</string>
+    <string name="quick_open_app">Apri in Instasave</string>
 
     <string name="disclaimer">Scarica solo contenuti tuoi o che hai il permesso di usare.</string>
 </resources>

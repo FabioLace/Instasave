@@ -8,7 +8,7 @@ SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
 ADB="$SDK_DIR/platform-tools/adb"
 EMULATOR="$SDK_DIR/emulator/emulator"
 AVD_NAME="${1:-Pixel_5}"
-APK="$ROOT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+APK="$ROOT_DIR/app/build/outputs/apk/debug/instasave-debug.apk"
 
 if [[ ! -x "$ADB" || ! -x "$EMULATOR" ]]; then
   echo "Android SDK not found at: $SDK_DIR" >&2

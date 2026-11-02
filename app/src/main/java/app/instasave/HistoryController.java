@@ -96,7 +96,12 @@ final class HistoryController {
         JSONArray files = HistoryRepository.files(item);
         boolean isCarousel = "carousel".equals(type);
         ((TextView) row.findViewById(R.id.itemIcon)).setText(isCarousel ? R.string.type_multi : labelFor(type));
-        ((TextView) row.findViewById(R.id.itemTitle)).setText(isCarousel ? R.string.history_item_carousel : R.string.history_item_content);
+        // Entries saved before usernames were stored, or whose response hid the author, keep
+        // the generic title.
+        String username = item.optString("username", "");
+        TextView title = row.findViewById(R.id.itemTitle);
+        if (!username.isEmpty()) title.setText("@" + username);
+        else title.setText(isCarousel ? R.string.history_item_carousel : R.string.history_item_content);
         String downloadedAt = downloadAge(item.optLong("createdAt", 0L));
         ((TextView) row.findViewById(R.id.itemMeta)).setText(isCarousel
                 ? quantity(R.plurals.history_file_count, files.length()) + " · " + downloadedAt
@@ -111,6 +116,12 @@ final class HistoryController {
             itemHeader.setContentDescription(activity.getString("photo".equals(type) ? R.string.history_open_photo
                     : "story".equals(type) ? R.string.history_open_story : R.string.history_open_video));
             itemHeader.setOnClickListener(v -> openFile(file));
+        }
+        Uri postUri = instagramPostUri(item.optString("url", null));
+        if (postUri != null) {
+            View openPost = row.findViewById(R.id.openHistoryPost);
+            openPost.setVisibility(View.VISIBLE);
+            openPost.setOnClickListener(v -> { UiMotion.tap(v); openPost(postUri); });
         }
         row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeItem(position));
         container.addView(row);
@@ -236,6 +247,22 @@ final class HistoryController {
                 });
             } catch (Exception ignored) { }
         });
+    }
+
+    /** The permalink without share-tracking parameters, or null for direct media links. */
+    private static Uri instagramPostUri(String url) {
+        if (url == null || url.isEmpty()) return null;
+        Uri uri = Uri.parse(url);
+        String host = uri.getHost();
+        if (host == null || !(host.equals("instagram.com") || host.endsWith(".instagram.com"))) return null;
+        return uri.buildUpon().clearQuery().fragment(null).build();
+    }
+
+    private void openPost(Uri postUri) {
+        // The Instagram app claims instagram.com links, so it opens the post when installed;
+        // otherwise the browser does.
+        try { activity.startActivity(new Intent(Intent.ACTION_VIEW, postUri)); }
+        catch (Exception error) { statusReporter.show(activity.getString(R.string.history_open_post_failed), true); }
     }
 
     private void openFile(JSONObject file) {

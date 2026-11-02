@@ -77,6 +77,19 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <ImageView
+            android:id="@+id/openHistoryPost"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="2dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/history_open_post"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_open_post"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/removeHistoryItem"
             android:layout_width="wrap_content"

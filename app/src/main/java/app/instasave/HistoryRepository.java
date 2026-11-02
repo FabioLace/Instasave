@@ -1,5 +1,6 @@
 package app.instasave;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 
 import org.json.JSONArray;
@@ -15,6 +16,9 @@ final class HistoryRepository {
     private final SharedPreferences preferences;
 
     HistoryRepository(SharedPreferences preferences) { this.preferences = preferences; }
+    // The history has always lived in MainActivity's getPreferences() file; the bubble's sheet
+    // writes to the same file so its downloads show up in the app.
+    static HistoryRepository of(Context context) { return new HistoryRepository(context.getSharedPreferences("MainActivity", Context.MODE_PRIVATE)); }
     JSONArray entries() throws Exception { return new JSONArray(preferences.getString(HISTORY_KEY, "[]")); }
     boolean isExpanded() { return preferences.getBoolean(EXPANDED_KEY, true); }
     void setExpanded(boolean expanded) { preferences.edit().putBoolean(EXPANDED_KEY, expanded).apply(); }
@@ -32,6 +36,7 @@ final class HistoryRepository {
                 .put("type", result.type)
                 .put("createdAt", System.currentTimeMillis());
         if (!result.items.isEmpty() && result.items.get(0).previewUrl != null) current.put("preview", result.items.get(0).previewUrl);
+        if (result.username != null) current.put("username", result.username);
         JSONArray files = new JSONArray();
         for (MediaResolver.MediaItem item : items) {
             JSONObject file = new JSONObject().put("name", "photo".equals(item.type) ? jpegName(item.filename) : item.filename).put("type", item.type);

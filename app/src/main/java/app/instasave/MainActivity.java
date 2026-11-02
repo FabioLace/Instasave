@@ -1,5 +1,6 @@
 package app.instasave;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
@@ -9,17 +10,20 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import java.util.List;
@@ -29,6 +33,7 @@ import java.util.concurrent.Executors;
 
 /** Coordinates link analysis with the preview, download, and history components. */
 public final class MainActivity extends Activity {
+    private static final int REQUEST_NOTIFICATIONS = 1;
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
     private final ExecutorService metadataExecutor = Executors.newFixedThreadPool(2);
@@ -38,6 +43,7 @@ public final class MainActivity extends Activity {
     private ImageButton clearUrlButton;
     private Button analyzeButton;
     private TextView statusText;
+    private Switch bubbleSwitch;
     private PreviewController previewController;
     private HistoryRepository historyRepository;
     private HistoryController historyController;
@@ -47,6 +53,8 @@ public final class MainActivity extends Activity {
     private boolean downloadInProgress;
     private boolean downloadResetPending;
     private boolean downloadReceiverRegistered;
+    private boolean notificationsRequested;
+    private boolean overlayPermissionRequested;
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -61,8 +69,9 @@ public final class MainActivity extends Activity {
         clearUrlButton = findViewById(R.id.clearUrlButton);
         analyzeButton = findViewById(R.id.analyzeButton);
         statusText = findViewById(R.id.statusText);
+        bubbleSwitch = findViewById(R.id.bubbleSwitch);
         ImageButton pasteButton = findViewById(R.id.pasteButton);
-        historyRepository = new HistoryRepository(getPreferences(MODE_PRIVATE));
+        historyRepository = HistoryRepository.of(this);
         ImageLoader imageLoader = new ImageLoader(getContentResolver());
         previewController = new PreviewController(this, imageLoader, imageExecutor, metadataExecutor);
         previewController.setDownloadClickListener(v -> downloadPending());
@@ -78,6 +87,8 @@ public final class MainActivity extends Activity {
         analyzeButton.setOnClickListener(v -> { UiMotion.tap(v); resolveLink(); });
         pasteButton.setOnClickListener(v -> { UiMotion.tap(v); pasteLink(); });
         clearUrlButton.setOnClickListener(v -> { urlInput.setText(""); clearStatus(); });
+        bubbleSwitch.setOnClickListener(v -> setBubbleEnabled(bubbleSwitch.isChecked()));
+        findViewById(R.id.bubbleCard).setOnClickListener(v -> { bubbleSwitch.toggle(); setBubbleEnabled(bubbleSwitch.isChecked()); });
         urlInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -100,6 +111,51 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) registerReceiver(downloadReceiver, downloads, Context.RECEIVER_EXPORTED);
         else registerReceiver(downloadReceiver, downloads);
         downloadReceiverRegistered = true;
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        bubbleSwitch.setChecked(BubbleService.isEnabled());
+    }
+
+    // Runs when coming back from a full-screen activity, such as the overlay permission settings,
+    // unlike onResume(), which also follows the notification permission dialog.
+    @Override protected void onRestart() {
+        super.onRestart();
+        if (overlayPermissionRequested) {
+            overlayPermissionRequested = false;
+            if (Settings.canDrawOverlays(this)) BubbleService.start(this);
+            else showStatus(R.string.bubble_permission_denied, true);
+        }
+        // Downloads started from the bubble are written to the same history while this activity is stopped.
+        historyController.render();
+    }
+
+    private void setBubbleEnabled(boolean enabled) {
+        if (enabled) enableBubble();
+        else BubbleService.stop(this);
+    }
+
+    /** Asks once for notifications (the bubble's stop action lives there), then for the overlay permission. */
+    private void enableBubble() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationsRequested
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationsRequested = true;
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+            return;
+        }
+        if (Settings.canDrawOverlays(this)) {
+            BubbleService.start(this);
+            return;
+        }
+        overlayPermissionRequested = true;
+        startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+    }
+
+    // The bubble works without notifications, so it continues whatever the answer.
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == REQUEST_NOTIFICATIONS) enableBubble();
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -139,7 +195,7 @@ public final class MainActivity extends Activity {
                 MediaResolver.Result result = new MediaResolver().resolve(source);
                 runOnUiThread(() -> showResolvedResult(source, result));
             } catch (Exception error) {
-                runOnUiThread(() -> { showStatus(errorMessage(error), true); analyzeButton.setEnabled(true); });
+                runOnUiThread(() -> { showStatus(UserFacingException.messageFor(this, error), true); analyzeButton.setEnabled(true); });
             }
         });
     }
@@ -195,20 +251,14 @@ public final class MainActivity extends Activity {
         statusText.setVisibility(View.GONE);
     }
 
-    private String errorMessage(Exception error) {
-        if (error instanceof UserFacingException) return getString(((UserFacingException) error).messageRes);
-        String message = error.getMessage();
-        return message == null || message.trim().isEmpty() ? getString(R.string.error_generic) : message;
-    }
-
-    private static boolean isValidUrl(String raw) {
+    static boolean isValidUrl(String raw) {
         try {
             Uri uri = Uri.parse(extractUrl(raw));
             return ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) && uri.getHost() != null;
         } catch (Exception ignored) { return false; }
     }
 
-    private static String extractUrl(String text) {
+    static String extractUrl(String text) {
         int start = text.indexOf("http");
         if (start < 0) return text.trim();
         int end = text.indexOf(' ', start);
