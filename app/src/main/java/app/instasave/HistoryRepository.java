@@ -36,6 +36,7 @@ final class HistoryRepository {
                 .put("type", result.type)
                 .put("createdAt", System.currentTimeMillis());
         if (!result.items.isEmpty() && result.items.get(0).previewUrl != null) current.put("preview", result.items.get(0).previewUrl);
+        if (result.username != null) current.put("username", result.username);
         JSONArray files = new JSONArray();
         for (MediaResolver.MediaItem item : items) {
             JSONObject file = new JSONObject().put("name", "photo".equals(item.type) ? jpegName(item.filename) : item.filename).put("type", item.type);

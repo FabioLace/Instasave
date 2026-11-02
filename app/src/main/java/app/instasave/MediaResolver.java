@@ -38,6 +38,8 @@ final class MediaResolver {
             "\\b%s=[\\\"'](.*?)[\\\"']", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern SRCSET_ENTRY = Pattern.compile("(.+?)\\s+(\\d+)w");
     private static final Pattern MEDIA_PK = Pattern.compile("\\d+");
+    private static final Pattern EMBED_USERNAME = Pattern.compile(
+            "class=[\\\"']UsernameText[\\\"'][^>]*>([^<]+)<", Pattern.CASE_INSENSITIVE);
 
     static final class MediaItem {
         final String downloadUrl;
@@ -74,10 +76,15 @@ final class MediaResolver {
     static final class Result {
         final List<MediaItem> items;
         final String type;
+        /** The post author's username, or null when the response didn't expose it. */
+        final String username;
 
-        Result(List<MediaItem> items) {
+        Result(List<MediaItem> items) { this(items, null); }
+
+        Result(List<MediaItem> items, String username) {
             this.items = items;
             this.type = items.size() > 1 ? "carousel" : items.get(0).type;
+            this.username = username;
         }
     }
 
@@ -148,15 +155,16 @@ final class MediaResolver {
         // stored as a string inside the embed bootstrap response, so it needs the extra pass in
         // searchForMediaNode() below.
         List<MediaItem> embedItems = Collections.emptyList();
-        if (embedHtml != null) {
-            JSONObject embedMediaNode = findMediaNode(embedHtml, shortcode);
-            if (embedMediaNode != null) {
-                embedItems = mediaItemsFrom(embedMediaNode);
-            }
+        JSONObject embedMediaNode = embedHtml == null ? null : findMediaNode(embedHtml, shortcode);
+        if (embedMediaNode != null) {
+            embedItems = mediaItemsFrom(embedMediaNode);
         }
+        String username = usernameOf(mediaNode);
+        if (username == null) username = usernameOf(embedMediaNode);
+        if (username == null) username = usernameFromPublicEmbed(embedHtml);
         List<MediaItem> items = bestAvailableItems(pageItems, embedItems);
         boolean singleCoverOnly = items.size() == 1 && items.get(0).videoMissing;
-        if (!items.isEmpty() && !singleCoverOnly) return new Result(items);
+        if (!items.isEmpty() && !singleCoverOnly) return new Result(items, username);
 
         // A single video whose data only carried the cover may still be in the og: tags.
         String videoUrl = openGraphContent(html, "og:video:secure_url");
@@ -164,9 +172,10 @@ final class MediaResolver {
         if (videoUrl != null) {
             String filename = "instasave_" + System.currentTimeMillis() + extensionFor(videoUrl, ".mp4");
             String previewUrl = singleCoverOnly ? items.get(0).previewUrl : null;
-            return new Result(Collections.singletonList(new MediaItem(videoUrl, filename, "video", previewUrl)));
+            return new Result(Collections.singletonList(new MediaItem(videoUrl, filename, "video", previewUrl)),
+                    username);
         }
-        if (singleCoverOnly) return new Result(items);
+        if (singleCoverOnly) return new Result(items, username);
 
         // The permalink page exposes og:image only as a small, often cropped preview. Instagram's
         // public embed exposes the post image and its responsive sources, including the largest one.
@@ -176,7 +185,24 @@ final class MediaResolver {
         MediaItem cover = new MediaItem(imageUrl, filename, "photo", imageUrl);
         // The embed image of a reel is its cover, never the content the user asked for.
         cover.videoMissing = videoExpected || (embedHtml != null && embedDeclaresVideo(embedHtml));
-        return new Result(Collections.singletonList(cover));
+        return new Result(Collections.singletonList(cover), username);
+    }
+
+    /** The permalink page nests the author under "user", the embed and GraphQL under "owner". */
+    private static String usernameOf(JSONObject mediaNode) {
+        if (mediaNode == null) return null;
+        for (String key : new String[] {"user", "owner"}) {
+            JSONObject author = mediaNode.optJSONObject(key);
+            String username = author == null ? null : nonEmpty(author.optString("username", null));
+            if (username != null) return username;
+        }
+        return null;
+    }
+
+    private static String usernameFromPublicEmbed(String html) {
+        if (html == null) return null;
+        Matcher match = EMBED_USERNAME.matcher(html);
+        return match.find() ? nonEmpty(match.group(1).trim()) : null;
     }
 
     private static boolean lacksVideo(Result result, boolean videoExpected) {

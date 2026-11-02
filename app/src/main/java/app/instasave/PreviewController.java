@@ -200,12 +200,16 @@ final class PreviewController {
         boolean carousel = result.items.size() > 1;
         if (!carousel) {
             MediaResolver.MediaItem item = result.items.get(0);
-            String description = activity.getString("video".equals(item.type) ? R.string.preview_video_source : R.string.preview_photo_source);
+            // The author says more about the content than the generic "from the public post".
+            String description = result.username != null ? "@" + result.username
+                    : activity.getString("video".equals(item.type) ? R.string.preview_video_source : R.string.preview_photo_source);
             String details = formatDetails(item);
             meta.setText(details.isEmpty() ? description : description + "\n" + details);
             return;
         }
-        meta.setText(activity.getString(R.string.preview_items_source, result.items.size()));
+        meta.setText(result.username != null
+                ? activity.getString(R.string.preview_items_by, result.items.size(), result.username)
+                : activity.getString(R.string.preview_items_source, result.items.size()));
         for (int i = 0; i < result.items.size() && i < detailsLabels.size(); i++) {
             String details = formatDetails(result.items.get(i));
             TextView label = detailsLabels.get(i);

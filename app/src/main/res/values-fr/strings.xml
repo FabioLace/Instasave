@@ -45,6 +45,7 @@
     <string name="preview_photo_source">Image de la publication publique</string>
     <string name="preview_video_source">Aperçu de la publication publique</string>
     <string name="preview_items_source">%1$d éléments de la publication publique</string>
+    <string name="preview_items_by">%1$d éléments de @%2$s</string>
     <string name="preview_source_mb">Original %1$.1f Mo</string>
     <string name="preview_source_kb">Original %1$.0f ko</string>
     <string name="preview_source_bytes">Original %1$d o</string>
@@ -92,6 +93,8 @@
     <string name="history_open_video">Ouvrir la vidéo téléchargée</string>
     <string name="history_open_story">Ouvrir la story téléchargée</string>
     <string name="history_open_file">Ouvrir %1$s</string>
+    <string name="history_open_post">Ouvrir la publication d\'origine sur Instagram</string>
+    <string name="history_open_post_failed">Aucune application ne peut ouvrir ce lien Instagram.</string>
     <string name="history_files_expand">Afficher les fichiers du carrousel téléchargé</string>
     <string name="history_files_collapse">Masquer les fichiers du carrousel téléchargé</string>
     <string name="history_file_fallback_name">Fichier téléchargé</string>

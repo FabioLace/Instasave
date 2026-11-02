@@ -45,6 +45,7 @@
     <string name="preview_photo_source">Image from the public post</string>
     <string name="preview_video_source">Preview from the public post</string>
     <string name="preview_items_source">%1$d items from the public post</string>
+    <string name="preview_items_by">%1$d items by @%2$s</string>
     <string name="preview_source_mb">Source %1$.1f MB</string>
     <string name="preview_source_kb">Source %1$.0f KB</string>
     <string name="preview_source_bytes">Source %1$d B</string>
@@ -92,6 +93,8 @@
     <string name="history_open_video">Open downloaded video</string>
     <string name="history_open_story">Open downloaded story</string>
     <string name="history_open_file">Open %1$s</string>
+    <string name="history_open_post">Open the original post on Instagram</string>
+    <string name="history_open_post_failed">No app can open this Instagram link.</string>
     <string name="history_files_expand">Expand downloaded carousel files</string>
     <string name="history_files_collapse">Collapse downloaded carousel files</string>
     <string name="history_file_fallback_name">Downloaded file</string>
