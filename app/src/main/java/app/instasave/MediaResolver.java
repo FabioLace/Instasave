@@ -43,7 +43,8 @@ final class MediaResolver {
 
     static final class MediaItem {
         final String downloadUrl;
-        final String filename;
+        /** Set once the post author is known, see {@link Result}. */
+        String filename;
         final String type;
         final String previewUrl;
         final long resolutionArea;
@@ -85,8 +86,21 @@ final class MediaResolver {
             this.items = items;
             this.type = items.size() > 1 ? "carousel" : items.get(0).type;
             this.username = username;
+            // Items are built before the author is known: name the files after them here.
+            String label = username == null ? null : FILENAME_UNSAFE.matcher(username).replaceAll("_");
+            if (label != null && !label.isEmpty()) {
+                for (MediaItem item : items) {
+                    if (item.filename.startsWith(FILENAME_PREFIX)) {
+                        item.filename = FILENAME_PREFIX + label + "_"
+                                + item.filename.substring(FILENAME_PREFIX.length());
+                    }
+                }
+            }
         }
     }
+
+    private static final String FILENAME_PREFIX = "instasave_";
+    private static final Pattern FILENAME_UNSAFE = Pattern.compile("[^A-Za-z0-9._-]");
 
     Result resolve(String sourceUrl) throws Exception {
         if (isDirectMediaUrl(sourceUrl)) {
