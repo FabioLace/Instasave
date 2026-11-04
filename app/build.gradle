@@ -4,6 +4,13 @@ base {
     archivesName = 'instasave'
 }
 
+// Release signing credentials live outside git, in <root>/keystore.properties.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace 'app.instasave'
     compileSdk 34
@@ -14,6 +21,33 @@ android {
         targetSdk 34
         versionCode 1
         versionName '1.0'
+    }
+
+    signingConfigs {
+        if (!keystoreProperties.isEmpty()) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.findByName('release')
+        }
+    }
+
+    // Versioned name for release APKs only; debug keeps instasave-debug.apk for run-emulator.sh.
+    applicationVariants.configureEach { variant ->
+        if (variant.buildType.name == 'release') {
+            variant.outputs.configureEach {
+                def suffix = variant.signingConfig ? '' : '-unsigned'
+                outputFileName = "Instasave-${variant.versionName}-release${suffix}.apk"
+            }
+        }
     }
 
     compileOptions {
