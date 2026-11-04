@@ -9,7 +9,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:label="Instasave"
+        android:label="${appLabel}"
         android:theme="@style/Theme.Instasave"
         android:usesCleartextTraffic="false">
         <activity

@@ -42,7 +42,7 @@ Android configuration:
 
 | Item | Value |
 | --- | --- |
-| Application ID | `app.instasave` |
+| Application ID | `app.instasave` (debug: `app.instasave.debug`) |
 | Min SDK | 26 (Android 8.0) |
 | Target / Compile SDK | 34 |
 | Language | Java |
@@ -87,8 +87,12 @@ With an Android device connected and ADB available:
 
 ```bash
 adb install -r app/build/outputs/apk/debug/instasave-debug.apk
-adb shell monkey -p app.instasave 1
+adb shell monkey -p app.instasave.debug 1
 ```
+
+The debug build uses the `app.instasave.debug` package and is labelled "Instasave Debug", so it
+installs next to the release app instead of conflicting with its signature. The two apps keep
+separate history, settings and permissions (overlay included), so grant them again for the debug one.
 
 ## Project Structure
 

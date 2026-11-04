@@ -36,6 +36,6 @@ if ! "$ADB" get-state 2>/dev/null | grep -qx "device"; then
 fi
 
 "$ADB" install -r "$APK"
-"$ADB" shell am force-stop app.instasave
-"$ADB" shell monkey -p app.instasave 1 > /dev/null
+"$ADB" shell am force-stop app.instasave.debug
+"$ADB" shell monkey -p app.instasave.debug 1 > /dev/null
 echo "Instasave is open in the emulator."
