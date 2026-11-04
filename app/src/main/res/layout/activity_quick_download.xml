@@ -1,6 +1,6 @@
 <!-- Translucent sheet opened by the floating bubble; tapping outside the card closes it.
-     The card sits well above the bottom edge because reading the clipboard makes Android show the
-     "pasted from your clipboard" toast there, which would otherwise cover the download button. -->
+     The card is centred because reading the clipboard makes Android show the "pasted from your
+     clipboard" toast near the bottom edge, which would otherwise cover the download button. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/quickRoot"
     android:layout_width="match_parent"
@@ -11,10 +11,8 @@
         android:id="@+id/quickCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="104dp"
+        android:layout_gravity="center"
+        android:layout_margin="12dp"
         android:background="@drawable/bg_action_card"
         android:clickable="true"
         android:focusable="false"
