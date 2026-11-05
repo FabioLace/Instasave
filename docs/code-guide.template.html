@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Instasave works</title>
+<style>
+  :root {
+    --paper: #FFFFFF;
+    --ink: #172038;
+    --muted: #5D667A;
+    --faint: #8A92A6;
+    --rule: #E6E8EF;
+    --code-bg: #F7F8FB;
+    --accent: #6C4CF5;
+    --accent-soft: #EFEBFF;
+    --system: #F2F3F7;
+    --t-string: #16845B;
+    --t-comment: #7A8296;
+    --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121117;
+      --ink: #F1F0F7;
+      --muted: #B0ABBF;
+      --faint: #858196;
+      --rule: #2E2B36;
+      --code-bg: #19171F;
+      --accent: #A996FF;
+      --accent-soft: #2A2440;
+      --system: #1E1C25;
+      --t-string: #58D5A2;
+      --t-comment: #8E8A9C;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 18px/1.6 var(--serif);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  code { font: 0.8em/1.3 var(--mono); }
+  p code, li code, td code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 40px; }
+
+  header.top { padding: 56px 0 8px; max-width: 44em; }
+  h1 { font-size: 40px; line-height: 1.1; margin: 0 0 14px; letter-spacing: -0.01em; }
+  header.top p { color: var(--muted); margin: 0; }
+
+  /* Map */
+  .atlas {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 40px;
+    margin: 36px 0 0;
+    padding-bottom: 48px;
+    border-bottom: 1px solid var(--rule);
+  }
+  svg.map { width: 100%; height: auto; display: block; overflow: visible; }
+  .map .col-label { font: italic 14px var(--serif); fill: var(--faint); }
+  .map .group { fill: none; stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 3 4; }
+  .map .group-label { font: italic 13px var(--serif); fill: var(--faint); }
+  .map .edge { fill: none; stroke: var(--faint); stroke-width: 1.1; opacity: .45; }
+  .map .edge.dashed { stroke-dasharray: 4 4; }
+  .map .edge-label { font: italic 12px var(--serif); fill: var(--faint); text-anchor: middle; }
+  .map .tip { fill: var(--faint); }
+  .map .tip-on { fill: var(--accent); }
+  .map .node { cursor: pointer; outline: none; }
+  .map .node rect { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+  .map .node text { font: 12.5px var(--mono); fill: var(--ink); pointer-events: none; }
+  .map .node.entry rect { stroke: var(--faint); stroke-dasharray: 3 3; }
+  .map .node.entry text, .map .node.system text { font: 14px var(--serif); }
+  .map .node.system rect { fill: var(--system); stroke: none; }
+  .map .node:hover rect { stroke: var(--accent); }
+  .map .node:focus-visible rect { stroke: var(--accent); stroke-width: 2; }
+  .map.picked .node { opacity: .38; }
+  .map.picked .node.near { opacity: 1; }
+  .map.picked .node.on, .map.picked .node.near { opacity: 1; }
+  .map .node.on rect { fill: var(--accent); stroke: var(--accent); }
+  .map .node.on text { fill: #FFFFFF; }
+  .map .node.near rect { stroke: var(--accent); }
+  .map.picked .edge { opacity: .12; }
+  .map.picked .edge.on { opacity: 1; stroke: var(--accent); stroke-width: 1.6; }
+  .map.picked .edge-label { opacity: .3; }
+  @media (prefers-color-scheme: dark) { .map .node.on text { fill: #121117; } }
+
+  .panel { border-left: 1px solid var(--rule); padding-left: 28px; min-height: 420px; }
+  .panel h2 { font: 600 19px/1.3 var(--mono); margin: 0 0 4px; overflow-wrap: anywhere; }
+  .panel .where { font-size: 15px; color: var(--muted); margin: 0 0 14px; }
+  .panel .where a { color: var(--muted); }
+  .panel p.what { font-size: 16.5px; line-height: 1.55; margin: 0 0 16px; }
+  .panel img { display: block; width: 100%; max-width: 300px; height: auto; border-radius: 10px; border: 1px solid var(--rule); margin: 0 0 16px; }
+  .panel .reads { font-size: 16px; margin: 0; }
+  .panel .reads ul { list-style: none; padding: 0; margin: 4px 0 0; }
+  .panel .reads li { margin: 2px 0; }
+  .helpers { font-size: 16px; color: var(--muted); max-width: 44em; margin: 20px 0 0; }
+
+  /* Contents */
+  .contents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; padding: 40px 0 8px; max-width: 760px; }
+  .contents h3 { font-size: 17px; margin: 0 0 6px; }
+  .contents h3 a { color: var(--ink); text-decoration: none; }
+  .contents ul { list-style: none; margin: 0; padding: 0; font-size: 16.5px; }
+  .contents li { margin: 3px 0; }
+
+  /* Walkthroughs */
+  .group-section { padding-top: 72px; }
+  h2 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .lede { color: var(--muted); margin: 0 0 8px; max-width: 40em; }
+  .walk { padding-top: 56px; }
+  .walk-head { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; margin-bottom: 8px; }
+  h3 { font-size: 23px; line-height: 1.25; margin: 0 0 6px; }
+  h3 code { font-size: 0.82em; }
+  .walk-intro { margin: 0; max-width: 36em; }
+  .shot { margin: 0; }
+  .shot img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--rule); }
+
+  .excerpt { margin-top: 26px; }
+  .excerpt-head { font: 13px var(--mono); color: var(--muted); padding: 0 0 8px; display: flex; gap: 14px; align-items: baseline; }
+  .excerpt-head .file { color: var(--ink); font-weight: 600; }
+  .excerpt-head a { color: var(--muted); text-decoration: none; }
+  .excerpt-head a[href] { text-decoration: underline; text-decoration-style: dotted; }
+  .excerpt-head a[href]:hover { color: var(--accent); }
+
+  .chunk {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 32px;
+    border-top: 1px solid var(--rule);
+  }
+  .excerpt .chunk:last-child { border-bottom: 1px solid var(--rule); }
+  pre.code {
+    margin: 0;
+    padding: 12px 0;
+    background: var(--code-bg);
+    font: 13px/1.6 var(--mono);
+    transition: background-color .15s;
+  }
+  pre.code code {
+    display: grid;
+    grid-template-columns: 3.4em minmax(0, 1fr);
+    font: inherit;
+  }
+  .ln { color: var(--faint); text-align: right; padding-right: 1.1em; user-select: none; }
+  .lc { white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 16px; }
+  .tk { font-weight: 600; }
+  .ts { color: var(--t-string); }
+  .tc { color: var(--t-comment); font-style: italic; }
+  .ta { color: var(--muted); }
+  .note { margin: 0; padding: 12px 0; font-size: 16px; line-height: 1.55; }
+  .chunk:hover pre.code { background: var(--accent-soft); }
+
+  /* End matter */
+  .end { padding-top: 88px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px; }
+  .end h2 { font-size: 24px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15.5px; }
+  td { padding: 7px 14px 7px 0; border-top: 1px solid var(--rule); vertical-align: top; }
+  .end p { font-size: 16.5px; }
+  footer { margin: 88px 0 0; padding: 18px 0 56px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 15px; }
+
+  @media (max-width: 980px) {
+    .wrap { padding: 0 20px; }
+    h1 { font-size: 32px; }
+    .atlas { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .panel { border-left: 0; padding-left: 0; min-height: 0; border-top: 1px solid var(--rule); padding-top: 20px; }
+    .chunk { grid-template-columns: 1fr; gap: 0; }
+    .note { padding-bottom: 4px; order: -1; }
+    .walk-head { grid-template-columns: 1fr; gap: 16px; }
+    .shot img { max-width: 360px; }
+    .contents, .end { grid-template-columns: 1fr; gap: 28px; }
+    .map-scroll { overflow-x: auto; }
+    .map-scroll svg.map { min-width: 680px; }
+  }
+  @media print {
+    .atlas { display: block; }
+    .panel { display: none; }
+    .chunk { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>How Instasave works</h1>
+  <p>A map of the classes, and the code that matters with notes in the margin. Pick a class on the map to see what it does and where to read it.</p>
+</header>
+
+<section class="atlas" aria-label="Class map">
+  <div>
+    <div class="map-scroll">{{MAP}}</div>
+    <p class="helpers">Two small helpers are used everywhere and left off the map: <code>UiMotion</code>, four short animations that are skipped when the system has animations turned off, and <code>UserFacingException</code>, an error that carries a string resource so it's shown in the phone's language.</p>
+  </div>
+  <aside class="panel" id="panel" aria-live="polite"></aside>
+</section>
+
+<nav class="contents" aria-label="Code readings">{{CONTENTS}}</nav>
+
+{{GROUPS}}
+
+<div class="end">
+  <section id="kotlin">
+    <h2>If you read Kotlin</h2>
+    <p>The app is Java. These are the patterns that come up most.</p>
+    <table>
+      <tr><td><code>final String type;</code></td><td><code>val type: String</code></td></tr>
+      <tr><td><code>v -&gt; { ... }</code></td><td><code>{ v -&gt; ... }</code></td></tr>
+      <tr><td><code>static</code> methods</td><td><code>companion object</code> or top level</td></tr>
+      <tr><td><code>interface Listener</code> + <code>this::finishDownload</code></td><td><code>(Boolean, String?) -&gt; Unit</code></td></tr>
+      <tr><td><code>try (InputStream s = ...)</code></td><td><code>s.use { }</code></td></tr>
+      <tr><td><code>executor.execute</code> + <code>runOnUiThread</code></td><td>coroutines with <code>Dispatchers.IO</code></td></tr>
+    </table>
+  </section>
+  <section id="builds">
+    <h2>Builds</h2>
+    <p>Java 17, minimum Android 8.0, target SDK 34, and no third-party libraries: <code>org.json</code> ships with Android.</p>
+    <p>The debug build is <code>app.instasave.debug</code>, named Instasave Debug with its own icon, so it installs next to the release app with separate history and permissions. The release build is signed when <code>keystore.properties</code> exists in the project root.</p>
+    <p><code>./run-emulator.sh</code> builds, starts an emulator, installs the debug app and opens it.</p>
+  </section>
+</div>
+
+<footer>Generated from the <code>{{BRANCH}}</code> branch on {{DATE}} by <code>docs/build-guide.py</code>; line numbers match that version. Screenshots are from the debug build on an emulator. Opened from disk, file and line links open VS Code.</footer>
+
+</div>
+
+<script>
+(function () {
+  var DATA = {{PANEL_DATA}};
+  var root = location.protocol === 'file:'
+    ? decodeURIComponent(location.pathname).replace(/\/docs\/[^/]*$/, '')
+    : null;
+  function vscodeUrl(file, line) {
+    return root ? 'vscode://file' + root + '/app/src/main/java/app/instasave/' + file + ':' + (line || 1) : null;
+  }
+
+  document.querySelectorAll('a.vscode').forEach(function (a) {
+    var url = vscodeUrl(a.dataset.file, a.dataset.line);
+    if (url) { a.href = url; a.title = 'Open in VS Code'; }
+  });
+
+  var map = document.querySelector('svg.map');
+  var panel = document.getElementById('panel');
+  var nodes = map.querySelectorAll('.node');
+  var edges = map.querySelectorAll('.edge');
+
+  function pick(id) {
+    var info = DATA[id];
+    if (!info) return;
+    map.classList.add('picked');
+    var near = {};
+    edges.forEach(function (e) {
+      var on = e.dataset.a === id || e.dataset.b === id;
+      e.classList.toggle('on', on);
+      e.setAttribute('marker-end', on ? 'url(#tip-on)' : 'url(#tip)');
+      if (on) { near[e.dataset.a] = true; near[e.dataset.b] = true; }
+    });
+    if (id === 'MainActivity') { near.PreviewController = true; near.HistoryController = true; }
+    if (id === 'PreviewController' || id === 'HistoryController') near.MainActivity = true;
+    nodes.forEach(function (n) {
+      var self = n.dataset.id === id;
+      n.classList.toggle('on', self);
+      n.classList.toggle('near', !self && !!near[n.dataset.id]);
+      n.setAttribute('aria-pressed', self ? 'true' : 'false');
+    });
+
+    var html = '<h2>' + info.label + '</h2>';
+    if (info.file) {
+      var url = vscodeUrl(info.file);
+      var name = url ? '<a href="' + url + '" title="Open in VS Code">' + info.file + '</a>' : info.file;
+      html += '<p class="where">' + name + ', ' + info.lines + ' lines</p>';
+    } else {
+      html += '<p class="where">Outside the app’s code</p>';
+    }
+    html += '<p class="what">' + info.text + '</p>';
+    if (info.shot) html += '<img src="img/' + info.shot + '" alt="Screenshot of ' + info.label + ' on an emulator">';
+    if (info.walks.length) {
+      html += '<div class="reads">Read it in:<ul>' + info.walks.map(function (w) {
+        return '<li><a href="#' + w[0] + '">' + w[1] + '</a></li>';
+      }).join('') + '</ul></div>';
+    }
+    panel.innerHTML = html;
+  }
+
+  nodes.forEach(function (n) {
+    n.addEventListener('click', function () { pick(n.dataset.id); });
+    n.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(n.dataset.id); }
+    });
+  });
+  pick('MainActivity');
+})();
+</script>
+</body>
+</html>

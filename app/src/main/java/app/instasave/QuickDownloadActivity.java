@@ -123,13 +123,21 @@ public final class QuickDownloadActivity extends Activity {
         int count = resolved.items.size();
         boolean video = "video".equals(resolved.type);
         showState(count > 1 ? R.string.preview_carousel_ready : video ? R.string.preview_video_ready : R.string.preview_photo_ready,
-                count > 1 ? getString(R.string.preview_items_source, count)
-                        : getString(video ? R.string.preview_video_source : R.string.preview_photo_source), false);
+                sourceLabel(resolved, count, video), false);
         downloadButton.setText(count > 1 ? getString(R.string.quick_download_all, count) : getString(R.string.download_action));
         downloadButton.setVisibility(View.VISIBLE);
         openAppButton.setVisibility(View.VISIBLE);
         String previewUrl = resolved.items.get(0).previewUrl;
         if (previewUrl != null) loadPreview(previewUrl);
+    }
+
+    /** The author when the response exposed it, like the main screen's preview; otherwise the generic source. */
+    private String sourceLabel(MediaResolver.Result resolved, int count, boolean video) {
+        if (resolved.username == null) {
+            return count > 1 ? getString(R.string.preview_items_source, count)
+                    : getString(video ? R.string.preview_video_source : R.string.preview_photo_source);
+        }
+        return count > 1 ? getString(R.string.preview_items_by, count, resolved.username) : "@" + resolved.username;
     }
 
     private void loadPreview(String imageUrl) {
