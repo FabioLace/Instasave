@@ -10,3 +10,6 @@ local.properties
 keystore.properties
 *.jks
 *.keystore
+
+# Miscellaneous
+.playwright-mcp/*
