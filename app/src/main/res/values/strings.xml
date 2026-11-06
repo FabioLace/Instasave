@@ -6,8 +6,6 @@
     <string name="link_analyze">Find content</string>
 
     <!-- Status messages -->
-    <string name="status_link_received">Instagram link received. Ready to analyze.</string>
-    <string name="status_link_pasted">Link pasted. Ready to analyze.</string>
     <string name="status_clipboard_empty">Clipboard is empty.</string>
     <string name="status_clipboard_invalid">Clipboard doesn\'t contain a valid link.</string>
     <string name="status_analyzing">Analyzing content...</string>

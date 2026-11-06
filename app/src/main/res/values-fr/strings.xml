@@ -6,8 +6,6 @@
     <string name="link_analyze">Trouver le contenu</string>
 
     <!-- Status messages -->
-    <string name="status_link_received">Lien Instagram reçu. Prêt pour l\'analyse.</string>
-    <string name="status_link_pasted">Lien collé. Prêt pour l\'analyse.</string>
     <string name="status_clipboard_empty">Le presse-papiers est vide.</string>
     <string name="status_clipboard_invalid">Le presse-papiers ne contient pas de lien valide.</string>
     <string name="status_analyzing">Analyse du contenu en cours...</string>

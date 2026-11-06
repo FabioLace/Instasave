@@ -170,7 +170,7 @@ public final class MainActivity extends Activity {
         if (shared == null) return;
         urlInput.setText(extractUrl(shared));
         urlInput.setSelection(urlInput.length());
-        showStatus(R.string.status_link_received, false);
+        clearStatus();
     }
 
     private void pasteLink() {
@@ -183,7 +183,7 @@ public final class MainActivity extends Activity {
         if (!isValidUrl(link)) { showStatus(R.string.status_clipboard_invalid, true); return; }
         urlInput.setText(link);
         urlInput.setSelection(urlInput.length());
-        showStatus(R.string.status_link_pasted, false);
+        clearStatus();
     }
 
     private void resolveLink() {

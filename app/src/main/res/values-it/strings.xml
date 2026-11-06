@@ -6,8 +6,6 @@
     <string name="link_analyze">Trova contenuto</string>
 
     <!-- Status messages -->
-    <string name="status_link_received">Link Instagram ricevuto. Pronto per l\'analisi.</string>
-    <string name="status_link_pasted">Link incollato. Pronto per l\'analisi.</string>
     <string name="status_clipboard_empty">Gli appunti sono vuoti.</string>
     <string name="status_clipboard_invalid">Gli appunti non contengono un link valido.</string>
     <string name="status_analyzing">Analisi del contenuto in corso...</string>

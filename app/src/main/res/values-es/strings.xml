@@ -6,8 +6,6 @@
     <string name="link_analyze">Buscar contenido</string>
 
     <!-- Status messages -->
-    <string name="status_link_received">Enlace de Instagram recibido. Listo para analizar.</string>
-    <string name="status_link_pasted">Enlace pegado. Listo para analizar.</string>
     <string name="status_clipboard_empty">El portapapeles está vacío.</string>
     <string name="status_clipboard_invalid">El portapapeles no contiene un enlace válido.</string>
     <string name="status_analyzing">Analizando el contenido...</string>
