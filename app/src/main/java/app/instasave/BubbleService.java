@@ -92,6 +92,7 @@ public final class BubbleService extends Service {
 
     // DragListener calls performClick() itself for taps, so the bubble stays reachable by TalkBack.
     @SuppressLint("ClickableViewAccessibility")
+    // STYLE: floating bubble: 56dp circle, drawable/bg_bubble with drawable/ic_bubble_download.
     private void showBubble() {
         windowManager = getSystemService(WindowManager.class);
         int shadowSpace = dp(8);
@@ -119,6 +120,7 @@ public final class BubbleService extends Service {
         windowManager.addView(bubble, params);
     }
 
+    // STYLE: drop target to close the bubble: 64dp, drawable/bg_bubble_dismiss.
     private void addDismissTarget() {
         int size = dp(64);
         dismissTarget = new ImageView(this);

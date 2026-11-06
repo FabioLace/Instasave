@@ -3,6 +3,7 @@ package app.instasave;
 import android.animation.ValueAnimator;
 import android.view.View;
 
+// STYLE: all UI animations (reveal, fadeIn, selection, tap) live here.
 /** Short, optional transitions for content that appears after a user action. */
 final class UiMotion {
     private UiMotion() { }

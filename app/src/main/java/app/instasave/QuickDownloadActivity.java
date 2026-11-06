@@ -188,6 +188,7 @@ public final class QuickDownloadActivity extends Activity {
 
     private void showMessage(String text, boolean isError) {
         message.setText(text);
+        // STYLE: message color, muted or error (values/colors.xml).
         message.setTextColor(getColor(isError ? R.color.error : R.color.muted));
     }
 

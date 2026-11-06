@@ -1,3 +1,4 @@
+<!-- STYLE: app theme (dark), overrides values/styles.xml. -->
 <resources>
     <style name="Theme.Instasave" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>

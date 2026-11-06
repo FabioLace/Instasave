@@ -1,17 +1,19 @@
+<!-- STYLE: light theme palette. Every layout and drawable points to these names;
+     values-night/colors.xml overrides the same names for dark mode. -->
 <resources>
-    <color name="ink">#172038</color>
-    <color name="muted">#69738A</color>
-    <color name="surface">#FFFFFF</color>
-    <color name="canvas">#F7F8FC</color>
-    <color name="line">#E3E7F0</color>
-    <color name="accent">#6C4CF5</color>
-    <color name="accent_dark">#5136D3</color>
-    <color name="accent_soft">#F0EDFF</color>
-    <color name="accent_light">#8D78FF</color>
-    <color name="accent_soft_pressed">#E5E0FF</color>
-    <color name="accent_disabled">#D8D1FA</color>
-    <color name="hero_ink">#F8F7FF</color>
-    <color name="success">#16845B</color>
-    <color name="error">#B42318</color>
-    <color name="scrim">#73000000</color>
+    <color name="ink">#172038</color> <!-- main text -->
+    <color name="muted">#69738A</color> <!-- secondary text, hints, icons -->
+    <color name="surface">#FFFFFF</color> <!-- card and field background, text on accent buttons -->
+    <color name="canvas">#F7F8FC</color> <!-- window background -->
+    <color name="line">#E3E7F0</color> <!-- card, field and checkbox borders -->
+    <color name="accent">#6C4CF5</color> <!-- primary button, checked checkbox, system accent -->
+    <color name="accent_dark">#5136D3</color> <!-- accent text and icons (paste, Download, Clear) -->
+    <color name="accent_soft">#F0EDFF</color> <!-- paste button, thumbnail circles -->
+    <color name="accent_light">#8D78FF</color> <!-- unused (only bg_hero, itself unused) -->
+    <color name="accent_soft_pressed">#E5E0FF</color> <!-- paste button pressed -->
+    <color name="accent_disabled">#D8D1FA</color> <!-- primary button disabled -->
+    <color name="hero_ink">#F8F7FF</color> <!-- unused -->
+    <color name="success">#16845B</color> <!-- unused -->
+    <color name="error">#B42318</color> <!-- error messages (set from Java) -->
+    <color name="scrim">#73000000</color> <!-- dark veil behind the quick download card -->
 </resources>

@@ -1,8 +1,9 @@
+<!-- STYLE: carousel checkbox, checked state (accent square with white tick). Used via carousel_checkbox.xml. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <solid android:color="@color/accent" />
-            <corners android:radius="9dp" />
+            <corners android:radius="5dp" />
             <size android:width="28dp" android:height="28dp" />
         </shape>
     </item>

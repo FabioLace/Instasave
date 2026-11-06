@@ -1,3 +1,5 @@
+<!-- STYLE: app theme (light): font, window background, status and navigation bar colors.
+     Theme.Instasave.QuickDownload is the translucent sheet opened by the bubble. -->
 <resources>
     <style name="Theme.Instasave" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>

@@ -1,3 +1,4 @@
+<!-- STYLE: dark theme palette, overrides values/colors.xml. -->
 <resources>
     <!-- Semantic names stay the same so every existing surface follows night mode. -->
     <color name="ink">#F1F0F7</color>

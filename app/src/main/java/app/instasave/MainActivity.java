@@ -240,6 +240,7 @@ public final class MainActivity extends Activity {
 
     private void showStatus(String message, boolean isError) {
         statusText.setText(message);
+        // STYLE: status line color, muted or error (values/colors.xml).
         statusText.setTextColor(getColor(isError ? R.color.error : R.color.muted));
         statusText.setVisibility(View.VISIBLE);
         UiMotion.reveal(statusText, 5, 0);

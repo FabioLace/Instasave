@@ -1,4 +1,4 @@
-<!-- Translucent sheet opened by the floating bubble; tapping outside the card closes it.
+<!-- STYLE: quick download sheet. Translucent sheet opened by the floating bubble; tapping outside the card closes it.
      The card is centred because reading the clipboard makes Android show the "pasted from your
      clipboard" toast near the bottom edge, which would otherwise cover the download button. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -7,6 +7,7 @@
     android:layout_height="match_parent"
     android:background="@color/scrim">
 
+    <!-- BLOCK: card, background drawable/bg_action_card. -->
     <LinearLayout
         android:id="@+id/quickCard"
         android:layout_width="match_parent"
@@ -24,6 +25,7 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <!-- Thumbnail, background drawable/bg_history_icon. -->
             <ImageView
                 android:id="@+id/quickPreview"
                 android:layout_width="64dp"
@@ -65,6 +67,7 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Download button, background drawable/bg_primary. -->
         <Button
             android:id="@+id/quickDownloadButton"
             android:layout_width="match_parent"
@@ -77,6 +80,7 @@
             android:textStyle="bold"
             android:visibility="gone" />
 
+        <!-- "Open in Instasave" text button. -->
         <TextView
             android:id="@+id/quickOpenAppButton"
             android:layout_width="match_parent"

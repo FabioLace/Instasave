@@ -222,6 +222,7 @@ final class HistoryController {
                     preview.setVisibility(View.GONE);
                     type.setText("");
                     boolean isVideo = "video".equals(file.optString("type", "photo"));
+                    // STYLE: photo or video icon of a history file (drawable/ic_photo, drawable/ic_video).
                     type.setCompoundDrawablesWithIntrinsicBounds(isVideo ? R.drawable.ic_video : R.drawable.ic_photo, 0, 0, 0);
                     type.setContentDescription(activity.getString(isVideo ? R.string.history_file_video : R.string.history_file_photo));
                     return;
