@@ -1,0 +1,6 @@
+<!-- STYLE: square placeholder shown behind a thumbnail until the image loads: preview image,
+     carousel grid cells (PreviewController.java), quick download preview, history row and file previews.
+     Square like the loaded image, which is not clipped, so the shape does not change when it arrives. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/accent_soft" />
+</shape>

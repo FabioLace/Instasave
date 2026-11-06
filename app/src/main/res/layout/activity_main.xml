@@ -156,7 +156,7 @@
                     android:id="@+id/previewImage"
                     android:layout_width="88dp"
                     android:layout_height="88dp"
-                    android:background="@drawable/bg_history_icon"
+                    android:background="@drawable/bg_thumbnail"
                     android:contentDescription="@string/preview_image"
                     android:scaleType="centerCrop" />
 

@@ -1,5 +1,5 @@
-<!-- STYLE: soft accent circle behind thumbnails and icons: history rows, history files,
-     preview image, quick download preview, carousel grid cells (PreviewController.java). -->
+<!-- STYLE: soft accent circle behind the type icon of a history row when it has no thumbnail
+     (item_history.xml, itemIcon). Thumbnails use drawable/bg_thumbnail. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
     <solid android:color="@color/accent_soft" />
 </shape>

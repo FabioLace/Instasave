@@ -27,7 +27,7 @@
                 android:id="@+id/itemPreview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/bg_history_icon"
+                android:background="@drawable/bg_thumbnail"
                 android:contentDescription="@string/history_item_preview"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />

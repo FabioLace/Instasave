@@ -144,13 +144,13 @@ final class PreviewController {
         for (int i = 0; i < result.items.size(); i++) addSelectionCell(grid, result.items.get(i), i, gap, cellSize);
     }
 
-    // STYLE: carousel grid cell built in code: thumbnail on drawable/bg_history_icon,
+    // STYLE: carousel grid cell built in code: thumbnail on drawable/bg_thumbnail,
     // checkbox drawable/carousel_checkbox, caption 11sp muted. Grid gap and cell size are in the method above.
     private void addSelectionCell(GridLayout grid, MediaResolver.MediaItem item, int position, int gap, int cellSize) {
         LinearLayout tile = new LinearLayout(activity);
         tile.setOrientation(LinearLayout.VERTICAL);
         FrameLayout cell = new FrameLayout(activity);
-        cell.setBackgroundResource(R.drawable.bg_history_icon);
+        cell.setBackgroundResource(R.drawable.bg_thumbnail);
         tile.addView(cell, new LinearLayout.LayoutParams(cellSize, cellSize));
         ImageView thumbnail = new ImageView(activity);
         thumbnail.setContentDescription(activity.getString(R.string.preview_item_thumbnail, position + 1));

@@ -14,7 +14,7 @@
         android:id="@+id/historyFilePreview"
         android:layout_width="36dp"
         android:layout_height="36dp"
-        android:background="@drawable/bg_history_icon"
+        android:background="@drawable/bg_thumbnail"
         android:contentDescription=""
         android:scaleType="centerCrop"
         android:visibility="gone" />
