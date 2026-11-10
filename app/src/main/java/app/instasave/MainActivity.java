@@ -10,6 +10,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -25,6 +26,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.List;
 import java.util.Map;
@@ -34,6 +36,7 @@ import java.util.concurrent.Executors;
 /** Coordinates link analysis with the preview, download, and history components. */
 public final class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATIONS = 1;
+    private static final String PROJECT_URL = "https://github.com/FabioLace/Instasave";
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
     private final ExecutorService metadataExecutor = Executors.newFixedThreadPool(2);
@@ -86,6 +89,13 @@ public final class MainActivity extends Activity {
 
         analyzeButton.setOnClickListener(v -> { UiMotion.tap(v); resolveLink(); });
         pasteButton.setOnClickListener(v -> { UiMotion.tap(v); pasteLink(); });
+        findViewById(R.id.githubButton).setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PROJECT_URL)));
+            } catch (ActivityNotFoundException error) {
+                Toast.makeText(this, R.string.open_github_failed, Toast.LENGTH_SHORT).show();
+            }
+        });
         clearUrlButton.setOnClickListener(v -> { urlInput.setText(""); clearStatus(); });
         bubbleSwitch.setOnClickListener(v -> setBubbleEnabled(bubbleSwitch.isChecked()));
         findViewById(R.id.bubbleCard).setOnClickListener(v -> { bubbleSwitch.toggle(); setBubbleEnabled(bubbleSwitch.isChecked()); });

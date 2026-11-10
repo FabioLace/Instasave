@@ -1,4 +1,6 @@
 <resources>
+    <string name="open_github">Apri il progetto su GitHub</string>
+    <string name="open_github_failed">Nessuna app può aprire GitHub.</string>
     <!-- Link input -->
     <string name="link_title">Incolla il link</string>
     <string name="link_clear">Cancella il link</string>
