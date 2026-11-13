@@ -19,7 +19,7 @@ Native Android app for analyzing public Instagram permalinks and saving photos, 
 - Analyze public posts, reels, and carousels.
 - Preview content before downloading it.
 - Select individual items from a carousel.
-- Keep a local history of initiated downloads, with local file availability and previews.
+- Keep a local history of initiated downloads, with local file availability and previews; files deleted from the device, for example in a file manager, are marked as not found.
 - Show relative download time (`Downloaded just now`, minutes, hours, or days ago); expanded history refreshes as the time changes.
 - Available in English, Italian, French, and Spanish, following the device language.
 - On Android 8 and 9, the first download asks for storage access, which those versions need to write to the `Download` folder. Android 10 and later need no permission.

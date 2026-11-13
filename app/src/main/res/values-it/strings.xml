@@ -98,6 +98,8 @@
     <string name="history_file_fallback_name">File scaricato</string>
     <string name="history_file_photo">File foto</string>
     <string name="history_file_video">File video</string>
+    <string name="history_file_not_found">File non trovato</string>
+    <string name="history_files_not_found">File non trovati</string>
     <string name="history_file_missing">File non trovato. Il download potrebbe essere ancora in corso oppure il file è stato eliminato.</string>
     <string name="history_no_viewer">Nessuna app disponibile per aprire questo file.</string>
 

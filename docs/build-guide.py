@@ -295,7 +295,7 @@ INFO = {
         text="Draws the preview card and, for carousels, a three-column grid of checkboxes built in code. Sizes and durations arrive later from `MediaProbe` and are filled in only if the same post is still on screen.",
         walks=["analyze"]),
     "HistoryController": dict(file="HistoryController.java",
-        text="Rebuilds the whole history list on every change: with five entries at most, that's simpler than a `RecyclerView`. It checks in the background whether each file still exists, and updates the age labels every minute while an entry is less than an hour old. Open carousels stay open across rebuilds.",
+        text="Rebuilds the whole history list on every change: with five entries at most, that's simpler than a `RecyclerView`. It checks in the background whether each file still exists, and marks an entry *not found* in red once its files are gone and none is still being saved. It updates the age labels every minute while an entry is less than an hour old. Open carousels stay open across rebuilds.",
         walks=["history"]),
     "QuickDownloadActivity": dict(file="QuickDownloadActivity.java", shot="quick-sheet.jpg",
         text="The translucent sheet the bubble opens. It downloads every item at once; Open in Instasave hands the link to `MainActivity` to pick carousel items one by one.",

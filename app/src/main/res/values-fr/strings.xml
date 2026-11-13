@@ -98,6 +98,8 @@
     <string name="history_file_fallback_name">Fichier téléchargé</string>
     <string name="history_file_photo">Fichier photo</string>
     <string name="history_file_video">Fichier vidéo</string>
+    <string name="history_file_not_found">Fichier introuvable</string>
+    <string name="history_files_not_found">Fichiers introuvables</string>
     <string name="history_file_missing">Fichier introuvable. Le téléchargement est peut-être encore en cours ou le fichier a été supprimé.</string>
     <string name="history_no_viewer">Aucune application disponible pour ouvrir ce fichier.</string>
 

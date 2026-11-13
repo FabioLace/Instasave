@@ -98,6 +98,8 @@
     <string name="history_file_fallback_name">Downloaded file</string>
     <string name="history_file_photo">Photo file</string>
     <string name="history_file_video">Video file</string>
+    <string name="history_file_not_found">File not found</string>
+    <string name="history_files_not_found">Files not found</string>
     <string name="history_file_missing">File not found. The download may still be finishing or the file was deleted.</string>
     <string name="history_no_viewer">No local viewer is available to open this file.</string>
 
