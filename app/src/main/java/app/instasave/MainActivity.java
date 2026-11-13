@@ -1,15 +1,12 @@
 package app.instasave;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -25,6 +22,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.List;
 import java.util.Map;
@@ -34,6 +32,10 @@ import java.util.concurrent.Executors;
 /** Coordinates link analysis with the preview, download, and history components. */
 public final class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATIONS = 1;
+    private static final int REQUEST_STORAGE = 2;
+    private static final String PROJECT_URL = "https://github.com/FabioLace/Instasave";
+    /** Set by the bubble's "Open in Instasave": the shared link is analyzed right away, not only pasted. */
+    static final String EXTRA_ANALYZE = "app.instasave.extra.ANALYZE";
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
     private final ExecutorService metadataExecutor = Executors.newFixedThreadPool(2);
@@ -50,17 +52,12 @@ public final class MainActivity extends Activity {
     private DownloadController downloadController;
     private MediaResolver.Result pendingResult;
     private String pendingSource;
+    /** Incremented by every analysis, so a slower earlier one can't touch the screen. */
+    private int resolveGeneration;
     private boolean downloadInProgress;
     private boolean downloadResetPending;
-    private boolean downloadReceiverRegistered;
     private boolean notificationsRequested;
     private boolean overlayPermissionRequested;
-
-    private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-            downloadController.handleCompleted(intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L));
-        }
-    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -82,10 +79,17 @@ public final class MainActivity extends Activity {
                     @Override public void clear() { clearStatus(); }
                 });
         downloadController = new DownloadController(this, saveExecutor, this::finishDownload);
-        registerDownloadReceiver();
+        downloadController.register();
 
         analyzeButton.setOnClickListener(v -> { UiMotion.tap(v); resolveLink(); });
         pasteButton.setOnClickListener(v -> { UiMotion.tap(v); pasteLink(); });
+        findViewById(R.id.githubButton).setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PROJECT_URL)));
+            } catch (ActivityNotFoundException error) {
+                Toast.makeText(this, R.string.open_github_failed, Toast.LENGTH_SHORT).show();
+            }
+        });
         clearUrlButton.setOnClickListener(v -> { urlInput.setText(""); clearStatus(); });
         bubbleSwitch.setOnClickListener(v -> setBubbleEnabled(bubbleSwitch.isChecked()));
         findViewById(R.id.bubbleCard).setOnClickListener(v -> { bubbleSwitch.toggle(); setBubbleEnabled(bubbleSwitch.isChecked()); });
@@ -99,23 +103,18 @@ public final class MainActivity extends Activity {
             }
             @Override public void afterTextChanged(Editable s) { }
         });
-        receiveSharedLink(getIntent());
-        historyController.render();
+        // A recreated activity gets its old intent again; analyzing it once more would be unexpected.
+        receiveSharedLink(getIntent(), state == null);
         UiMotion.reveal(findViewById(R.id.appHeader), 8, 0);
         UiMotion.reveal(findViewById(R.id.linkCard), 14, 70);
-    }
-
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void registerDownloadReceiver() {
-        IntentFilter downloads = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) registerReceiver(downloadReceiver, downloads, Context.RECEIVER_EXPORTED);
-        else registerReceiver(downloadReceiver, downloads);
-        downloadReceiverRegistered = true;
     }
 
     @Override protected void onResume() {
         super.onResume();
         bubbleSwitch.setChecked(BubbleService.isEnabled());
+        // Also covers the bubble's sheet: it is translucent, so this activity is only paused under it
+        // and onRestart() doesn't run, yet the sheet's downloads are written to the same history.
+        historyController.render();
     }
 
     // Runs when coming back from a full-screen activity, such as the overlay permission settings,
@@ -127,8 +126,6 @@ public final class MainActivity extends Activity {
             if (Settings.canDrawOverlays(this)) BubbleService.start(this);
             else showStatus(R.string.bubble_permission_denied, true);
         }
-        // Downloads started from the bubble are written to the same history while this activity is stopped.
-        historyController.render();
     }
 
     private void setBubbleEnabled(boolean enabled) {
@@ -156,52 +153,72 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQUEST_NOTIFICATIONS) enableBubble();
+        if (requestCode == REQUEST_STORAGE) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) downloadPending();
+            else showStatus(R.string.error_storage_permission, true);
+        }
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        receiveSharedLink(intent);
+        receiveSharedLink(intent, true);
     }
 
-    private void receiveSharedLink(Intent intent) {
+    private void receiveSharedLink(Intent intent, boolean mayAnalyze) {
         if (!Intent.ACTION_SEND.equals(intent.getAction()) || !"text/plain".equals(intent.getType())) return;
         String shared = intent.getStringExtra(Intent.EXTRA_TEXT);
         if (shared == null) return;
         urlInput.setText(extractUrl(shared));
         urlInput.setSelection(urlInput.length());
-        showStatus(R.string.status_link_received, false);
+        clearStatus();
+        if (mayAnalyze && intent.getBooleanExtra(EXTRA_ANALYZE, false) && analyzeButton.isEnabled()) resolveLink();
     }
 
     private void pasteLink() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (clipboard == null || !clipboard.hasPrimaryClip()) { showStatus(R.string.status_clipboard_empty, true); return; }
-        ClipData clip = clipboard.getPrimaryClip();
-        if (clip == null || clip.getItemCount() == 0) { showStatus(R.string.status_clipboard_empty, true); return; }
-        CharSequence content = clip.getItemAt(0).coerceToText(this);
-        String link = content == null ? "" : extractUrl(content.toString());
+        String content = clipboardText(this);
+        if (content == null) { showStatus(R.string.status_clipboard_empty, true); return; }
+        String link = extractUrl(content);
         if (!isValidUrl(link)) { showStatus(R.string.status_clipboard_invalid, true); return; }
         urlInput.setText(link);
         urlInput.setSelection(urlInput.length());
-        showStatus(R.string.status_link_pasted, false);
+        clearStatus();
     }
 
     private void resolveLink() {
         String source = urlInput.getText().toString().trim();
+        int generation = ++resolveGeneration;
         analyzeButton.setEnabled(false);
         showStatus(R.string.status_analyzing, false);
         resolverExecutor.execute(() -> {
             try {
                 MediaResolver.Result result = new MediaResolver().resolve(source);
-                runOnUiThread(() -> showResolvedResult(source, result));
+                runOnUiThread(() -> showResolvedResult(generation, source, result));
             } catch (Exception error) {
-                runOnUiThread(() -> { showStatus(UserFacingException.messageFor(this, error), true); analyzeButton.setEnabled(true); });
+                runOnUiThread(() -> showResolveError(generation, source, error));
             }
         });
     }
 
-    private void showResolvedResult(String source, MediaResolver.Result result) {
-        if (!source.equals(urlInput.getText().toString().trim())) return;
+    /**
+     * False when a newer analysis has started, which owns the screen, or when the link was edited
+     * meanwhile: then the "Analyzing…" status is cleared, and the button is left to the text watcher.
+     */
+    private boolean isCurrentAnalysis(int generation, String source) {
+        if (generation != resolveGeneration) return false;
+        if (source.equals(urlInput.getText().toString().trim())) return true;
+        clearStatus();
+        return false;
+    }
+
+    private void showResolveError(int generation, String source, Exception error) {
+        if (!isCurrentAnalysis(generation, source)) return;
+        showStatus(UserFacingException.messageFor(this, error), true);
+        analyzeButton.setEnabled(true);
+    }
+
+    private void showResolvedResult(int generation, String source, MediaResolver.Result result) {
+        if (!isCurrentAnalysis(generation, source)) return;
         pendingResult = result;
         pendingSource = source;
         previewController.show(result, downloadInProgress);
@@ -213,6 +230,11 @@ public final class MainActivity extends Activity {
         if (pendingResult == null) return;
         List<MediaResolver.MediaItem> selected = previewController.selectedItems(pendingResult);
         if (selected.isEmpty()) { showStatus(R.string.status_select_item, true); return; }
+        // Android 9 and earlier: asked on the first download, which resumes once it is granted.
+        if (DownloadController.needsStoragePermission(this)) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE);
+            return;
+        }
         downloadInProgress = true;
         previewController.updateDownloadButton(true, false);
         showStatus(selected.size() > 1 ? R.string.status_downloads_started : R.string.status_download_started, false);
@@ -240,6 +262,7 @@ public final class MainActivity extends Activity {
 
     private void showStatus(String message, boolean isError) {
         statusText.setText(message);
+        // STYLE: status line color, muted or error (values/colors.xml).
         statusText.setTextColor(getColor(isError ? R.color.error : R.color.muted));
         statusText.setVisibility(View.VISIBLE);
         UiMotion.reveal(statusText, 5, 0);
@@ -249,6 +272,15 @@ public final class MainActivity extends Activity {
         statusText.animate().cancel();
         statusText.setText(null);
         statusText.setVisibility(View.GONE);
+    }
+
+    /** The text of the clipboard's first item, or null when it holds nothing. Also used by the bubble's sheet. */
+    static String clipboardText(Context context) {
+        ClipboardManager clipboard = (ClipboardManager) context.getSystemService(CLIPBOARD_SERVICE);
+        ClipData clip = clipboard == null ? null : clipboard.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) return null;
+        CharSequence content = clip.getItemAt(0).coerceToText(context);
+        return content == null ? null : content.toString();
     }
 
     static boolean isValidUrl(String raw) {
@@ -261,19 +293,20 @@ public final class MainActivity extends Activity {
     static String extractUrl(String text) {
         int start = text.indexOf("http");
         if (start < 0) return text.trim();
-        int end = text.indexOf(' ', start);
-        return (end < 0 ? text.substring(start) : text.substring(start, end)).trim();
+        // Shared text often puts the caption on the next line, so the link ends at any whitespace.
+        return text.substring(start).split("\\s", 2)[0];
     }
 
     @Override protected void onDestroy() {
         if (isFinishing()) urlInput.setText("");
-        if (downloadReceiverRegistered) unregisterReceiver(downloadReceiver);
+        downloadController.unregister();
         historyController.dispose();
         uiHandler.removeCallbacksAndMessages(null);
         resolverExecutor.shutdownNow();
         imageExecutor.shutdownNow();
         metadataExecutor.shutdownNow();
-        saveExecutor.shutdownNow();
+        // Like the bubble's sheet: a photo that's being saved finishes after the screen is closed.
+        saveExecutor.shutdown();
         super.onDestroy();
     }
 }

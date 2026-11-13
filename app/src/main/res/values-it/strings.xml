@@ -1,4 +1,6 @@
 <resources>
+    <string name="open_github">Apri il progetto su GitHub</string>
+    <string name="open_github_failed">Nessuna app può aprire GitHub.</string>
     <!-- Link input -->
     <string name="link_title">Incolla il link</string>
     <string name="link_clear">Cancella il link</string>
@@ -6,8 +8,6 @@
     <string name="link_analyze">Trova contenuto</string>
 
     <!-- Status messages -->
-    <string name="status_link_received">Link Instagram ricevuto. Pronto per l\'analisi.</string>
-    <string name="status_link_pasted">Link incollato. Pronto per l\'analisi.</string>
     <string name="status_clipboard_empty">Gli appunti sono vuoti.</string>
     <string name="status_clipboard_invalid">Gli appunti non contengono un link valido.</string>
     <string name="status_analyzing">Analisi del contenuto in corso...</string>
@@ -26,14 +26,13 @@
     <string name="error_unreadable">Impossibile leggere questo contenuto pubblico.</string>
     <string name="error_unavailable">Questo contenuto pubblico non è disponibile.</string>
     <string name="error_invalid_image">Il file ricevuto non è un\'immagine valida.</string>
-    <string name="error_jpeg_unsupported">Il salvataggio in JPEG richiede Android 10 o versioni successive.</string>
+    <string name="error_storage_permission">Consenti l\'accesso alla memoria per salvare foto e video su questa versione di Android.</string>
     <string name="error_jpeg_create">Impossibile creare il file JPEG.</string>
     <string name="error_jpeg_convert">Impossibile convertire l\'immagine in JPEG.</string>
 
     <!-- Media types -->
     <string name="type_photo">Foto</string>
     <string name="type_video">Video</string>
-    <string name="type_story">Storia</string>
     <string name="type_carousel">Carosello</string>
     <string name="type_multi">Multi</string>
 
@@ -91,7 +90,6 @@
     </plurals>
     <string name="history_open_photo">Apri la foto scaricata</string>
     <string name="history_open_video">Apri il video scaricato</string>
-    <string name="history_open_story">Apri la storia scaricata</string>
     <string name="history_open_file">Apri %1$s</string>
     <string name="history_open_post">Apri il post originale su Instagram</string>
     <string name="history_open_post_failed">Nessuna app può aprire questo link di Instagram.</string>
@@ -100,6 +98,8 @@
     <string name="history_file_fallback_name">File scaricato</string>
     <string name="history_file_photo">File foto</string>
     <string name="history_file_video">File video</string>
+    <string name="history_file_not_found">File non trovato</string>
+    <string name="history_files_not_found">File non trovati</string>
     <string name="history_file_missing">File non trovato. Il download potrebbe essere ancora in corso oppure il file è stato eliminato.</string>
     <string name="history_no_viewer">Nessuna app disponibile per aprire questo file.</string>
 

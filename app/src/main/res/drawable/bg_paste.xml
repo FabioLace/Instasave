@@ -1,4 +1,5 @@
+<!-- STYLE: soft accent button: paste button and "Download" button in the preview card (activity_main.xml). -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_pressed="true"><shape android:shape="rectangle"><solid android:color="@color/accent_soft_pressed" /><corners android:radius="14dp" /></shape></item>
-    <item><shape android:shape="rectangle"><solid android:color="@color/accent_soft" /><corners android:radius="14dp" /></shape></item>
+    <item android:state_pressed="true"><shape android:shape="rectangle"><solid android:color="@color/accent_soft_pressed" /><corners android:radius="8dp" /></shape></item>
+    <item><shape android:shape="rectangle"><solid android:color="@color/accent_soft" /><corners android:radius="8dp" /></shape></item>
 </selector>

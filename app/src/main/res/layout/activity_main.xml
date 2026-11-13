@@ -1,3 +1,5 @@
+<!-- STYLE: main screen. Spacing, text sizes and colors are set inline on each view;
+     shapes come from drawable/bg_*.xml, colors from values/colors.xml. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -11,6 +13,7 @@
         android:paddingTop="18dp"
         android:paddingBottom="28dp">
 
+        <!-- BLOCK: header, app icon (mipmap/ic_launcher) and name. -->
         <LinearLayout
             android:id="@+id/appHeader"
             android:layout_width="match_parent"
@@ -33,8 +36,18 @@
                 android:textColor="@color/ink"
                 android:textSize="22sp"
                 android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/githubButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/open_github"
+                android:padding="11dp"
+                android:src="@drawable/ic_github" />
         </LinearLayout>
 
+        <!-- BLOCK: link card, background drawable/bg_action_card. -->
         <LinearLayout
             android:id="@+id/linkCard"
             android:layout_width="match_parent"
@@ -64,6 +77,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1">
 
+                    <!-- Link field, background drawable/bg_input. -->
                     <EditText
                         android:id="@+id/urlInput"
                         android:layout_width="match_parent"
@@ -92,6 +106,7 @@
                         android:visibility="gone" />
                 </FrameLayout>
 
+                <!-- Paste button, background drawable/bg_paste, icon drawable/ic_paste. -->
                 <ImageButton
                     android:id="@+id/pasteButton"
                     android:layout_width="54dp"
@@ -103,6 +118,7 @@
                     android:src="@drawable/ic_paste" />
             </LinearLayout>
 
+            <!-- "Find content" button, background drawable/bg_primary. -->
             <Button
                 android:id="@+id/analyzeButton"
                 android:layout_width="match_parent"
@@ -117,6 +133,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- BLOCK: status line under the link card; color set in MainActivity.java (muted or error). -->
         <TextView
             android:id="@+id/statusText"
             android:layout_width="match_parent"
@@ -127,7 +144,7 @@
             android:textSize="13sp"
             android:visibility="gone" />
 
-        <!-- Scheda mostrata dopo l'analisi: anteprima, azione e selezione del carousel. -->
+        <!-- BLOCK: preview card shown after analysis (background drawable/bg_action_card): preview, action and carousel selection. -->
         <LinearLayout
             android:id="@+id/previewContainer"
             android:layout_width="match_parent"
@@ -148,7 +165,7 @@
                     android:id="@+id/previewImage"
                     android:layout_width="88dp"
                     android:layout_height="88dp"
-                    android:background="@drawable/bg_history_icon"
+                    android:background="@drawable/bg_thumbnail"
                     android:contentDescription="@string/preview_image"
                     android:scaleType="centerCrop" />
 
@@ -175,6 +192,7 @@
                     android:textColor="@color/muted"
                     android:textSize="13sp" />
 
+                <!-- "Download" button, background drawable/bg_paste. -->
                 <Button
                     android:id="@+id/downloadButton"
                     android:layout_width="wrap_content"
@@ -201,6 +219,7 @@
                 android:textStyle="bold"
                 android:visibility="gone" />
 
+            <!-- Carousel grid, built in PreviewController.java. -->
             <LinearLayout
                 android:id="@+id/carouselSelectionContainer"
                 android:layout_width="match_parent"
@@ -210,6 +229,7 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- BLOCK: history header ("RECENT" label, Clear, count and arrow). -->
         <LinearLayout
             android:id="@+id/historyHeader"
             android:layout_width="match_parent"
@@ -257,6 +277,7 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- BLOCK: history list; each row is layout/item_history.xml. -->
         <LinearLayout
             android:id="@+id/historyContainer"
             android:layout_width="match_parent"
@@ -264,6 +285,7 @@
             android:layout_marginTop="8dp"
             android:orientation="vertical" />
 
+        <!-- BLOCK: empty history message, background drawable/bg_action_card. -->
         <TextView
             android:id="@+id/emptyHistory"
             android:layout_width="match_parent"
@@ -277,6 +299,7 @@
             android:textColor="@color/muted"
             android:textSize="14sp" />
 
+        <!-- BLOCK: floating bubble card with switch, background drawable/bg_action_card. -->
         <LinearLayout
             android:id="@+id/bubbleCard"
             android:layout_width="match_parent"
@@ -319,6 +342,7 @@
                 android:contentDescription="@string/bubble_title" />
         </LinearLayout>
 
+        <!-- BLOCK: disclaimer at the bottom. -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

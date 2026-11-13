@@ -4,7 +4,6 @@ import android.graphics.BitmapFactory;
 
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
 
 /** Reads optional file metadata without delaying the initial post preview. */
 final class MediaProbe {
@@ -13,10 +12,7 @@ final class MediaProbe {
     static void inspect(MediaResolver.MediaItem item) {
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) new URL(item.downloadUrl).openConnection();
-            connection.setConnectTimeout(8_000);
-            connection.setReadTimeout(8_000);
-            connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
+            connection = Http.open(item.downloadUrl, 8_000);
             connection.setRequestProperty("Accept-Encoding", "identity");
             boolean imageBounds = "photo".equals(item.type) && (item.width <= 0 || item.height <= 0);
             connection.setRequestMethod(imageBounds ? "GET" : "HEAD");

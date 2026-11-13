@@ -4,15 +4,24 @@ import android.content.ContentResolver;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.LruCache;
+import android.view.View;
+import android.widget.ImageView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 
-/** Decodes remote and local thumbnails off the UI thread, with a shared memory cache. */
+/**
+ * Decodes remote and local thumbnails off the UI thread. Each screen creates one, so its memory
+ * cache is shared by that screen's components, not across screens.
+ */
 final class ImageLoader {
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private final ContentResolver contentResolver;
     private final LruCache<String, Bitmap> cache = createCache();
 
@@ -49,11 +58,38 @@ final class ImageLoader {
         }
     }
 
+    /**
+     * Shows a remote thumbnail in target, decoded on executor; onShown, if any, runs once it's on
+     * screen. The view's tag remembers the latest request, so a slow answer never replaces a newer
+     * image in the same view.
+     */
+    void loadInto(ImageView target, String url, int size, Executor executor, Runnable onShown) {
+        load(target, url, () -> remoteThumbnail(url, size, size), executor, onShown);
+    }
+
+    /** Like the remote variant, for a file saved on the device. */
+    void loadInto(ImageView target, Uri uri, int size, Executor executor, Runnable onShown) {
+        load(target, uri.toString(), () -> localThumbnail(uri, size, size), executor, onShown);
+    }
+
+    private static void load(ImageView target, String key, Callable<Bitmap> decode, Executor executor, Runnable onShown) {
+        target.setTag(key);
+        executor.execute(() -> {
+            Bitmap image;
+            try { image = decode.call(); } catch (Exception ignored) { return; }
+            if (image == null) return;
+            MAIN.post(() -> {
+                if (!key.equals(target.getTag())) return;
+                target.setImageBitmap(image);
+                target.setVisibility(View.VISIBLE);
+                UiMotion.fadeIn(target);
+                if (onShown != null) onShown.run();
+            });
+        });
+    }
+
     static Bitmap fetchOriginal(String url) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(10_000);
-        connection.setReadTimeout(20_000);
-        connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
+        HttpURLConnection connection = Http.open(url, 20_000);
         try (InputStream stream = connection.getInputStream()) {
             return BitmapFactory.decodeStream(stream);
         } finally { connection.disconnect(); }
@@ -73,10 +109,7 @@ final class ImageLoader {
     }
 
     private static byte[] fetchBytes(String url, int timeoutMs) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(10_000);
-        connection.setReadTimeout(timeoutMs);
-        connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
+        HttpURLConnection connection = Http.open(url, timeoutMs);
         try (InputStream stream = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[16 * 1024];
             for (int count; (count = stream.read(buffer)) != -1;) output.write(buffer, 0, count);

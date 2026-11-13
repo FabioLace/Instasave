@@ -1,3 +1,5 @@
+<!-- STYLE: one history row on the main screen, background drawable/bg_history_item.
+     The type icon (photo or video) is set in HistoryController.java. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -5,6 +7,7 @@
     android:background="@drawable/bg_history_item"
     android:orientation="vertical">
 
+    <!-- BLOCK: row header: thumbnail, title, meta, expand arrow. -->
     <LinearLayout
         android:id="@+id/historyItemHeader"
         android:layout_width="match_parent"
@@ -24,7 +27,7 @@
                 android:id="@+id/itemPreview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/bg_history_icon"
+                android:background="@drawable/bg_thumbnail"
                 android:contentDescription="@string/history_item_preview"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
@@ -77,6 +80,7 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <!-- BLOCK: "open post on Instagram" icon button, icon drawable/ic_open_post. -->
         <ImageView
             android:id="@+id/openHistoryPost"
             android:layout_width="36dp"
@@ -90,6 +94,7 @@
             android:src="@drawable/ic_open_post"
             android:visibility="gone" />
 
+        <!-- BLOCK: "Remove" text button. -->
         <TextView
             android:id="@+id/removeHistoryItem"
             android:layout_width="wrap_content"
@@ -106,6 +111,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- BLOCK: files of an expanded carousel; each one is layout/item_history_file.xml. -->
     <LinearLayout
         android:id="@+id/historyFilesContainer"
         android:layout_width="match_parent"

@@ -1,7 +1,7 @@
 package app.instasave;
 
 import android.app.Activity;
-import android.graphics.Bitmap;
+import android.content.Context;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executor;
+
+import static app.instasave.UiMotion.dp;
 
 /** Owns the preview surface and the selection state of carousel items. */
 final class PreviewController {
@@ -63,8 +65,7 @@ final class PreviewController {
 
     void show(MediaResolver.Result result, boolean downloadInProgress) {
         displayedResult = result;
-        boolean carousel = result.items.size() > 1;
-        title.setText(carousel ? R.string.preview_carousel_ready : "video".equals(result.type) ? R.string.preview_video_ready : R.string.preview_photo_ready);
+        title.setText(readyTitle(result));
         image.animate().cancel();
         image.setAlpha(1f);
         image.setImageDrawable(null);
@@ -73,7 +74,7 @@ final class PreviewController {
         container.setVisibility(View.VISIBLE);
         UiMotion.reveal(container, 14, 0);
         String previewUrl = result.items.get(0).previewUrl;
-        if (previewUrl != null) loadPreview(previewUrl);
+        if (previewUrl != null) imageLoader.loadInto(image, previewUrl, dp(activity, 88), imageExecutor, null);
         probeDetails(result);
         updateDownloadButton(downloadInProgress, false);
     }
@@ -139,16 +140,18 @@ final class PreviewController {
         grid.setUseDefaultMargins(false);
         selectionsContainer.addView(grid, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        int gap = dp(6);
-        int cellSize = (activity.getResources().getDisplayMetrics().widthPixels - dp(72) - gap * 2) / 3;
+        int gap = dp(activity, 6);
+        int cellSize = (activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 72) - gap * 2) / 3;
         for (int i = 0; i < result.items.size(); i++) addSelectionCell(grid, result.items.get(i), i, gap, cellSize);
     }
 
+    // STYLE: carousel grid cell built in code: thumbnail on drawable/bg_thumbnail,
+    // checkbox drawable/carousel_checkbox, caption 11sp muted. Grid gap and cell size are in the method above.
     private void addSelectionCell(GridLayout grid, MediaResolver.MediaItem item, int position, int gap, int cellSize) {
         LinearLayout tile = new LinearLayout(activity);
         tile.setOrientation(LinearLayout.VERTICAL);
         FrameLayout cell = new FrameLayout(activity);
-        cell.setBackgroundResource(R.drawable.bg_history_icon);
+        cell.setBackgroundResource(R.drawable.bg_thumbnail);
         tile.addView(cell, new LinearLayout.LayoutParams(cellSize, cellSize));
         ImageView thumbnail = new ImageView(activity);
         thumbnail.setContentDescription(activity.getString(R.string.preview_item_thumbnail, position + 1));
@@ -164,14 +167,14 @@ final class PreviewController {
             if (selectionListener != null) selectionListener.onSelectionChanged();
         });
         selections.add(choice);
-        cell.addView(choice, new FrameLayout.LayoutParams(dp(42), dp(42), Gravity.END | Gravity.BOTTOM));
+        cell.addView(choice, new FrameLayout.LayoutParams(dp(activity, 42), dp(activity, 42), Gravity.END | Gravity.BOTTOM));
         cell.setOnClickListener(v -> choice.setChecked(!choice.isChecked()));
         TextView details = new TextView(activity);
         details.setTextColor(activity.getColor(R.color.muted));
         details.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         details.setMaxLines(3);
         details.setEllipsize(TextUtils.TruncateAt.END);
-        details.setPadding(0, dp(4), 0, 0);
+        details.setPadding(0, dp(activity, 4), 0, 0);
         details.setVisibility(View.GONE);
         tile.addView(details, new LinearLayout.LayoutParams(cellSize, LinearLayout.LayoutParams.WRAP_CONTENT));
         detailsLabels.add(details);
@@ -182,7 +185,7 @@ final class PreviewController {
         params.setMargins(position % 3 == 0 ? 0 : gap, 0, 0, gap);
         grid.addView(tile, params);
         UiMotion.reveal(tile, 8, Math.min(position, 6) * 45L);
-        if (item.previewUrl != null) loadThumbnail(thumbnail, item.previewUrl, cellSize);
+        if (item.previewUrl != null) imageLoader.loadInto(thumbnail, item.previewUrl, cellSize, imageExecutor, null);
     }
 
     private void probeDetails(MediaResolver.Result result) {
@@ -199,17 +202,12 @@ final class PreviewController {
     private void refreshDetails(MediaResolver.Result result) {
         boolean carousel = result.items.size() > 1;
         if (!carousel) {
-            MediaResolver.MediaItem item = result.items.get(0);
-            // The author says more about the content than the generic "from the public post".
-            String description = result.username != null ? "@" + result.username
-                    : activity.getString("video".equals(item.type) ? R.string.preview_video_source : R.string.preview_photo_source);
-            String details = formatDetails(item);
+            String description = sourceLabel(activity, result);
+            String details = formatDetails(result.items.get(0));
             meta.setText(details.isEmpty() ? description : description + "\n" + details);
             return;
         }
-        meta.setText(result.username != null
-                ? activity.getString(R.string.preview_items_by, result.items.size(), result.username)
-                : activity.getString(R.string.preview_items_source, result.items.size()));
+        meta.setText(sourceLabel(activity, result));
         for (int i = 0; i < result.items.size() && i < detailsLabels.size(); i++) {
             String details = formatDetails(result.items.get(i));
             TextView label = detailsLabels.get(i);
@@ -220,6 +218,25 @@ final class PreviewController {
                 choice.setContentDescription(selectionDescription(i, result.items.get(i)) + " · " + details);
             }
         }
+    }
+
+    /** The card's title, also used by the bubble's sheet. */
+    static int readyTitle(MediaResolver.Result result) {
+        if (result.items.size() > 1) return R.string.preview_carousel_ready;
+        return "video".equals(result.type) ? R.string.preview_video_ready : R.string.preview_photo_ready;
+    }
+
+    /**
+     * Where the content comes from, also used by the bubble's sheet. The author, when the response
+     * exposed it, says more than the generic "from the public post".
+     */
+    static String sourceLabel(Context context, MediaResolver.Result result) {
+        int count = result.items.size();
+        if (result.username != null) {
+            return count > 1 ? context.getString(R.string.preview_items_by, count, result.username) : "@" + result.username;
+        }
+        if (count > 1) return context.getString(R.string.preview_items_source, count);
+        return context.getString("video".equals(result.items.get(0).type) ? R.string.preview_video_source : R.string.preview_photo_source);
     }
 
     private String selectionDescription(int position, MediaResolver.MediaItem item) {
@@ -245,30 +262,10 @@ final class PreviewController {
         return TextUtils.join(" · ", parts);
     }
 
-    private void loadPreview(String imageUrl) { loadImage(image, imageUrl, dp(88)); }
-    private void loadThumbnail(ImageView target, String imageUrl, int size) { loadImage(target, imageUrl, size); }
-
-    private void loadImage(ImageView target, String imageUrl, int size) {
-        target.setTag(imageUrl);
-        imageExecutor.execute(() -> {
-            try {
-                Bitmap bitmap = imageLoader.remoteThumbnail(imageUrl, size, size);
-                if (bitmap != null) activity.runOnUiThread(() -> {
-                    if (imageUrl.equals(target.getTag())) {
-                        target.setImageBitmap(bitmap);
-                        UiMotion.fadeIn(target);
-                    }
-                });
-            } catch (Exception ignored) { }
-        });
-    }
-
     private int selectedCount() {
         if (selections.isEmpty()) return container.getVisibility() == View.VISIBLE ? 1 : 0;
         int count = 0;
         for (CheckBox choice : selections) if (choice.isChecked()) count++;
         return count;
     }
-
-    private int dp(int value) { return Math.round(value * activity.getResources().getDisplayMetrics().density); }
 }

@@ -1,11 +1,16 @@
 package app.instasave;
 
 import android.animation.ValueAnimator;
+import android.content.Context;
 import android.view.View;
 
-/** Short, optional transitions for content that appears after a user action. */
+// STYLE: all UI animations (reveal, fadeIn, selection, tap) live here.
+/** Short, optional transitions for content that appears after a user action, and the dp unit for views built in code. */
 final class UiMotion {
     private UiMotion() { }
+
+    /** Converts dp to pixels for sizes set in code. */
+    static int dp(Context context, int value) { return Math.round(value * context.getResources().getDisplayMetrics().density); }
 
     static void reveal(View view, int distanceDp, long delayMs) {
         view.animate().cancel();

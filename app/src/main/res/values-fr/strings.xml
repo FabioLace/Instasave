@@ -1,4 +1,6 @@
 <resources>
+    <string name="open_github">Ouvrir le projet sur GitHub</string>
+    <string name="open_github_failed">Aucune application ne peut ouvrir GitHub.</string>
     <!-- Link input -->
     <string name="link_title">Collez le lien</string>
     <string name="link_clear">Effacer le lien</string>
@@ -6,8 +8,6 @@
     <string name="link_analyze">Trouver le contenu</string>
 
     <!-- Status messages -->
-    <string name="status_link_received">Lien Instagram reçu. Prêt pour l\'analyse.</string>
-    <string name="status_link_pasted">Lien collé. Prêt pour l\'analyse.</string>
     <string name="status_clipboard_empty">Le presse-papiers est vide.</string>
     <string name="status_clipboard_invalid">Le presse-papiers ne contient pas de lien valide.</string>
     <string name="status_analyzing">Analyse du contenu en cours...</string>
@@ -26,14 +26,13 @@
     <string name="error_unreadable">Impossible de lire ce contenu public.</string>
     <string name="error_unavailable">Ce contenu public n\'est pas disponible.</string>
     <string name="error_invalid_image">Le fichier reçu n\'est pas une image valide.</string>
-    <string name="error_jpeg_unsupported">L\'enregistrement en JPEG nécessite Android 10 ou une version ultérieure.</string>
+    <string name="error_storage_permission">Autorisez l\'accès au stockage pour enregistrer des photos et des vidéos sur cette version d\'Android.</string>
     <string name="error_jpeg_create">Impossible de créer le fichier JPEG.</string>
     <string name="error_jpeg_convert">Impossible de convertir l\'image en JPEG.</string>
 
     <!-- Media types -->
     <string name="type_photo">Photo</string>
     <string name="type_video">Vidéo</string>
-    <string name="type_story">Story</string>
     <string name="type_carousel">Carrousel</string>
     <string name="type_multi">Multi</string>
 
@@ -91,7 +90,6 @@
     </plurals>
     <string name="history_open_photo">Ouvrir la photo téléchargée</string>
     <string name="history_open_video">Ouvrir la vidéo téléchargée</string>
-    <string name="history_open_story">Ouvrir la story téléchargée</string>
     <string name="history_open_file">Ouvrir %1$s</string>
     <string name="history_open_post">Ouvrir la publication d\'origine sur Instagram</string>
     <string name="history_open_post_failed">Aucune application ne peut ouvrir ce lien Instagram.</string>
@@ -100,6 +98,8 @@
     <string name="history_file_fallback_name">Fichier téléchargé</string>
     <string name="history_file_photo">Fichier photo</string>
     <string name="history_file_video">Fichier vidéo</string>
+    <string name="history_file_not_found">Fichier introuvable</string>
+    <string name="history_files_not_found">Fichiers introuvables</string>
     <string name="history_file_missing">Fichier introuvable. Le téléchargement est peut-être encore en cours ou le fichier a été supprimé.</string>
     <string name="history_no_viewer">Aucune application disponible pour ouvrir ce fichier.</string>
 

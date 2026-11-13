@@ -1,4 +1,6 @@
 <resources>
+    <string name="open_github">Open project on GitHub</string>
+    <string name="open_github_failed">No app can open GitHub.</string>
     <!-- Link input -->
     <string name="link_title">Paste the link</string>
     <string name="link_clear">Clear link</string>
@@ -6,8 +8,6 @@
     <string name="link_analyze">Find content</string>
 
     <!-- Status messages -->
-    <string name="status_link_received">Instagram link received. Ready to analyze.</string>
-    <string name="status_link_pasted">Link pasted. Ready to analyze.</string>
     <string name="status_clipboard_empty">Clipboard is empty.</string>
     <string name="status_clipboard_invalid">Clipboard doesn\'t contain a valid link.</string>
     <string name="status_analyzing">Analyzing content...</string>
@@ -26,14 +26,13 @@
     <string name="error_unreadable">Unable to read this public content.</string>
     <string name="error_unavailable">This public content is unavailable.</string>
     <string name="error_invalid_image">The received file is not a valid image.</string>
-    <string name="error_jpeg_unsupported">Saving as JPEG requires Android 10 or later.</string>
+    <string name="error_storage_permission">Allow access to storage to save photos and videos on this version of Android.</string>
     <string name="error_jpeg_create">Unable to create the JPEG file.</string>
     <string name="error_jpeg_convert">Unable to convert the image to JPEG.</string>
 
     <!-- Media types -->
     <string name="type_photo">Photo</string>
     <string name="type_video">Video</string>
-    <string name="type_story">Story</string>
     <string name="type_carousel">Carousel</string>
     <string name="type_multi">Multi</string>
 
@@ -91,7 +90,6 @@
     </plurals>
     <string name="history_open_photo">Open downloaded photo</string>
     <string name="history_open_video">Open downloaded video</string>
-    <string name="history_open_story">Open downloaded story</string>
     <string name="history_open_file">Open %1$s</string>
     <string name="history_open_post">Open the original post on Instagram</string>
     <string name="history_open_post_failed">No app can open this Instagram link.</string>
@@ -100,6 +98,8 @@
     <string name="history_file_fallback_name">Downloaded file</string>
     <string name="history_file_photo">Photo file</string>
     <string name="history_file_video">Video file</string>
+    <string name="history_file_not_found">File not found</string>
+    <string name="history_files_not_found">Files not found</string>
     <string name="history_file_missing">File not found. The download may still be finishing or the file was deleted.</string>
     <string name="history_no_viewer">No local viewer is available to open this file.</string>
 

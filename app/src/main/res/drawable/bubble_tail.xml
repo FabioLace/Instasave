@@ -1,0 +1,17 @@
+<!-- STYLE: tail of the bubble's speech-bubble card (activity_quick_download.xml, quickTail), pointing
+     right; BubblePopover mirrors it when the bubble is on the left. Same fill and border as
+     drawable/bg_action_card; the border is drawn only on the two outer edges, so the tail joins the card. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="12dp"
+    android:height="24dp"
+    android:viewportWidth="12"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/surface"
+        android:pathData="M0,0 L11.5,12 L0,24 Z" />
+    <path
+        android:pathData="M0,0 L11.5,12 L0,24"
+        android:strokeColor="@color/line"
+        android:strokeWidth="1"
+        android:strokeLineJoin="round" />
+</vector>

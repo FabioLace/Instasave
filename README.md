@@ -15,19 +15,20 @@
 Native Android app for analyzing public Instagram permalinks and saving photos, videos, or selected carousel items to the device's `Download/Instasave` folder.
 
 - Paste an Instagram link or receive one through Android's share sheet.
-- Download without leaving Instagram with the floating bubble: copy a post's link, tap the bubble, and save it from a compact sheet shown over the app.
+- Download without leaving Instagram with the floating bubble: copy a post's link, tap the bubble, and save it from a speech bubble that opens next to it.
 - Analyze public posts, reels, and carousels.
 - Preview content before downloading it.
 - Select individual items from a carousel.
-- Keep a local history of initiated downloads, with local file availability and previews.
+- Keep a local history of initiated downloads, with local file availability and previews; files deleted from the device, for example in a file manager, are marked as not found.
 - Show relative download time (`Downloaded just now`, minutes, hours, or days ago); expanded history refreshes as the time changes.
 - Available in English, Italian, French, and Spanish, following the device language.
+- On Android 8 and 9, the first download asks for storage access, which those versions need to write to the `Download` folder. Android 10 and later need no permission.
 
 ### Floating bubble
 
-Enable **Floating bubble** at the bottom of the main screen. The first time, Android asks for notifications (used for the bubble's *Hide bubble* action) and for permission to display over other apps. While enabled, a foreground service keeps a draggable bubble on screen that snaps to the nearest edge. To hide it, drag it onto the ✕ that appears at the bottom of the screen, turn off the switch, or use *Hide bubble* in its notification.
+Enable **Floating bubble** at the bottom of the main screen. The first time, Android asks for notifications (used for the bubble's *Hide bubble* action) and for permission to display over other apps. While enabled, a foreground service keeps a draggable bubble on screen that snaps to the nearest edge; it pops in when switched on and shrinks away when hidden. To hide it, drag it onto the ✕ that appears at the bottom of the screen, turn off the switch, or use *Hide bubble* in its notification.
 
-In Instagram, tap **Share → Copy link**, then tap the bubble: Instasave reads the link from the clipboard, shows a preview, and downloads every item (for carousels, *Open in Instasave* lets you pick individual items). Since Android 10 only the focused app can read the clipboard, so the bubble opens a translucent sheet instead of reading it from the background service. Bubble downloads appear in the app's history.
+In Instagram, tap **Share → Copy link**, then tap the bubble: a speech bubble grows out of it with a preview of the post, downloads every item, and shrinks back into the bubble when the download is done. *Open in Instasave* opens the app with the post already analyzed, where carousel items can be picked one by one. Since Android 10 only the focused app can read the clipboard, so the speech bubble is a translucent activity rather than a view of the background service. Bubble downloads appear in the app's history.
 
 The app uses only publicly available data and does not require an Instagram login. Content availability depends on Instagram and the post's privacy settings.
 

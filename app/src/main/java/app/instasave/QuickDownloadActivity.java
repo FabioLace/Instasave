@@ -1,15 +1,9 @@
 package app.instasave;
 
-import android.annotation.SuppressLint;
+import android.Manifest;
 import android.app.Activity;
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.graphics.Bitmap;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -26,11 +20,12 @@ import java.util.concurrent.Executors;
 
 /** Sheet opened by the floating bubble: downloads the link copied in Instagram without leaving it. */
 public final class QuickDownloadActivity extends Activity {
+    private static final int REQUEST_STORAGE = 1;
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
-    private View card;
+    private BubblePopover popover;
     private ImageView preview;
     private TextView title;
     private TextView message;
@@ -42,18 +37,15 @@ public final class QuickDownloadActivity extends Activity {
     private String source;
     private MediaResolver.Result result;
     private boolean clipboardRead;
-    private boolean downloadReceiverRegistered;
-
-    private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-            downloadController.handleCompleted(intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L));
-        }
-    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        // BubblePopover animates the card itself; Android 14+ ignores the theme's window animations.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0);
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0);
+        }
         setContentView(R.layout.activity_quick_download);
-        card = findViewById(R.id.quickCard);
         preview = findViewById(R.id.quickPreview);
         title = findViewById(R.id.quickTitle);
         message = findViewById(R.id.quickMessage);
@@ -62,28 +54,30 @@ public final class QuickDownloadActivity extends Activity {
         openAppButton = findViewById(R.id.quickOpenAppButton);
         imageLoader = new ImageLoader(getContentResolver());
         downloadController = new DownloadController(this, saveExecutor, this::finishDownload);
-        registerDownloadReceiver();
+        downloadController.register();
 
-        findViewById(R.id.quickRoot).setOnClickListener(v -> finish());
+        popover = new BubblePopover(findViewById(R.id.quickRoot), findViewById(R.id.quickScrim),
+                findViewById(R.id.quickPopover), findViewById(R.id.quickCard), findViewById(R.id.quickTail),
+                getIntent().getSourceBounds());
+        findViewById(R.id.quickScrim).setOnClickListener(v -> close());
         downloadButton.setOnClickListener(v -> { UiMotion.tap(v); download(); });
         openAppButton.setOnClickListener(v -> openInApp());
         showState(R.string.history_item_content, getString(R.string.status_analyzing), false);
         progress.setVisibility(View.VISIBLE);
-        UiMotion.reveal(card, 24, 0);
+        popover.show();
     }
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void registerDownloadReceiver() {
-        IntentFilter downloads = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) registerReceiver(downloadReceiver, downloads, Context.RECEIVER_EXPORTED);
-        else registerReceiver(downloadReceiver, downloads);
-        downloadReceiverRegistered = true;
-    }
+    /** Shrinks the speech bubble back into the bubble, then closes the sheet. */
+    private void close() { popover.dismiss(this::finish); }
+
+    @SuppressWarnings("deprecation")
+    @Override public void onBackPressed() { close(); }
 
     // Since Android 10 the clipboard is readable only by the app that has input focus, which this
     // activity gets after onResume(); reading it any earlier returns nothing.
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) popover.onWindowShown();
         if (!hasFocus || clipboardRead) return;
         clipboardRead = true;
         source = clipboardLink();
@@ -96,12 +90,9 @@ public final class QuickDownloadActivity extends Activity {
     }
 
     private String clipboardLink() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        ClipData clip = clipboard == null ? null : clipboard.getPrimaryClip();
-        if (clip == null || clip.getItemCount() == 0) return null;
-        CharSequence content = clip.getItemAt(0).coerceToText(this);
-        String link = content == null ? "" : MainActivity.extractUrl(content.toString());
-        return MainActivity.isValidUrl(link) ? link : null;
+        String content = MainActivity.clipboardText(this);
+        String link = content == null ? null : MainActivity.extractUrl(content);
+        return link != null && MainActivity.isValidUrl(link) ? link : null;
     }
 
     private void resolve() {
@@ -121,43 +112,34 @@ public final class QuickDownloadActivity extends Activity {
     private void showResult(MediaResolver.Result resolved) {
         result = resolved;
         int count = resolved.items.size();
-        boolean video = "video".equals(resolved.type);
-        showState(count > 1 ? R.string.preview_carousel_ready : video ? R.string.preview_video_ready : R.string.preview_photo_ready,
-                sourceLabel(resolved, count, video), false);
+        showState(PreviewController.readyTitle(resolved), PreviewController.sourceLabel(this, resolved), false);
         downloadButton.setText(count > 1 ? getString(R.string.quick_download_all, count) : getString(R.string.download_action));
         downloadButton.setVisibility(View.VISIBLE);
         openAppButton.setVisibility(View.VISIBLE);
         String previewUrl = resolved.items.get(0).previewUrl;
-        if (previewUrl != null) loadPreview(previewUrl);
-    }
-
-    /** The author when the response exposed it, like the main screen's preview; otherwise the generic source. */
-    private String sourceLabel(MediaResolver.Result resolved, int count, boolean video) {
-        if (resolved.username == null) {
-            return count > 1 ? getString(R.string.preview_items_source, count)
-                    : getString(video ? R.string.preview_video_source : R.string.preview_photo_source);
-        }
-        return count > 1 ? getString(R.string.preview_items_by, count, resolved.username) : "@" + resolved.username;
-    }
-
-    private void loadPreview(String imageUrl) {
-        int size = preview.getLayoutParams().width;
-        imageExecutor.execute(() -> {
-            try {
-                Bitmap bitmap = imageLoader.remoteThumbnail(imageUrl, size, size);
-                if (bitmap != null) runOnUiThread(() -> { preview.setImageBitmap(bitmap); UiMotion.fadeIn(preview); });
-            } catch (Exception ignored) { }
-        });
+        if (previewUrl != null) imageLoader.loadInto(preview, previewUrl, preview.getLayoutParams().width, imageExecutor, null);
     }
 
     private void download() {
         if (result == null) return;
+        // Android 9 and earlier: the system dialog only pauses the sheet, which stays open behind it.
+        if (DownloadController.needsStoragePermission(this)) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE);
+            return;
+        }
         downloadButton.setEnabled(false);
         downloadButton.setText(R.string.download_started);
         openAppButton.setVisibility(View.GONE);
         message.setText(result.items.size() > 1 ? R.string.status_downloads_started : R.string.status_download_started);
         Map<MediaResolver.MediaItem, Long> ids = downloadController.start(result.items);
         try { HistoryRepository.of(this).add(source, result, result.items, ids); } catch (Exception ignored) { }
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != REQUEST_STORAGE) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) download();
+        else showMessage(getString(R.string.error_storage_permission), true);
     }
 
     private void finishDownload(boolean failed, String failureMessage) {
@@ -167,7 +149,7 @@ public final class QuickDownloadActivity extends Activity {
             return;
         }
         showMessage(getString(R.string.status_download_completed), false);
-        uiHandler.postDelayed(this::finish, 1_500L);
+        uiHandler.postDelayed(this::close, 1_500L);
     }
 
     /** Hands the link to the full app, where carousel items can be picked one by one. */
@@ -176,6 +158,7 @@ public final class QuickDownloadActivity extends Activity {
                 .setAction(Intent.ACTION_SEND)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_TEXT, source)
+                .putExtra(MainActivity.EXTRA_ANALYZE, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
         finish();
     }
@@ -188,6 +171,7 @@ public final class QuickDownloadActivity extends Activity {
 
     private void showMessage(String text, boolean isError) {
         message.setText(text);
+        // STYLE: message color, muted or error (values/colors.xml).
         message.setTextColor(getColor(isError ? R.color.error : R.color.muted));
     }
 
@@ -199,7 +183,7 @@ public final class QuickDownloadActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
-        if (downloadReceiverRegistered) unregisterReceiver(downloadReceiver);
+        downloadController.unregister();
         uiHandler.removeCallbacksAndMessages(null);
         resolverExecutor.shutdownNow();
         imageExecutor.shutdownNow();

@@ -23,9 +23,20 @@ final class HistoryRepository {
     boolean isExpanded() { return preferences.getBoolean(EXPANDED_KEY, true); }
     void setExpanded(boolean expanded) { preferences.edit().putBoolean(EXPANDED_KEY, expanded).apply(); }
     void clear() { preferences.edit().remove(HISTORY_KEY).apply(); }
-    void remove(int position) throws Exception {
+    /**
+     * Identifies an entry across renders. Positions shift whenever the bubble's sheet adds a
+     * download, and legacy entries have no createdAt, so the stored JSON itself is the key.
+     */
+    static String keyOf(JSONObject entry) { return entry.toString(); }
+    /** Removes the first entry with this key; nothing happens if it is already gone. */
+    void remove(String key) throws Exception {
         JSONArray current = entries(), next = new JSONArray();
-        for (int i = 0; i < current.length(); i++) if (i != position) next.put(current.getJSONObject(i));
+        boolean removed = false;
+        for (int i = 0; i < current.length(); i++) {
+            JSONObject entry = current.getJSONObject(i);
+            if (!removed && keyOf(entry).equals(key)) removed = true;
+            else next.put(entry);
+        }
         preferences.edit().putString(HISTORY_KEY, next.toString()).apply();
     }
     void add(String url, MediaResolver.Result result, List<MediaResolver.MediaItem> items,
@@ -39,7 +50,7 @@ final class HistoryRepository {
         if (result.username != null) current.put("username", result.username);
         JSONArray files = new JSONArray();
         for (MediaResolver.MediaItem item : items) {
-            JSONObject file = new JSONObject().put("name", "photo".equals(item.type) ? jpegName(item.filename) : item.filename).put("type", item.type);
+            JSONObject file = new JSONObject().put("name", "photo".equals(item.type) ? DownloadController.jpegFilename(item.filename) : item.filename).put("type", item.type);
             if (item.previewUrl != null && !item.previewUrl.isEmpty()) file.put("preview", item.previewUrl);
             Long id = ids.get(item); if (id != null) file.put("downloadId", id);
             files.put(file);
@@ -55,5 +66,4 @@ final class HistoryRepository {
         if (legacy != null) for (int i = 0; i < legacy.length(); i++) { String name = legacy.optString(i, null); if (name != null) files.put(new JSONObject().put("name", name).put("type", "photo")); }
         return files;
     }
-    static String jpegName(String filename) { int dot = filename.lastIndexOf('.'); return (dot > 0 ? filename.substring(0, dot) : filename) + ".jpg"; }
 }

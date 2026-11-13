@@ -3,10 +3,11 @@ package app.instasave;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
+import android.content.ContentUris;
 import android.content.Intent;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.os.Build;
 import android.os.Handler;
 import android.provider.MediaStore;
@@ -19,7 +20,13 @@ import android.widget.TextView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
+
+import static app.instasave.UiMotion.dp;
 
 /** Renders and manages the persisted download history. */
 final class HistoryController {
@@ -38,7 +45,13 @@ final class HistoryController {
     private final TextView emptyHistory;
     private final TextView historyToggle;
     private final TextView clearHistoryButton;
-    private final Runnable refreshRunnable = this::render;
+    private final Runnable refreshRunnable = this::refreshAges;
+    /** Keys of the carousels whose file list is open, kept so a re-render doesn't close them. */
+    private final Set<String> expandedEntries = new HashSet<>();
+    /** Keys of the entries none of whose files are on the device any more, e.g. deleted in a file manager. */
+    private final Set<String> missingEntries = new HashSet<>();
+    /** Photos are saved within seconds and have no status to ask for, so a newer entry isn't reported missing yet. */
+    private static final long PHOTO_SAVE_GRACE_MS = 2L * 60L * 1000L;
     private int lastRenderedCount = -1;
 
     HistoryController(Activity activity, HistoryRepository repository, ImageLoader imageLoader,
@@ -71,8 +84,12 @@ final class HistoryController {
             container.setVisibility(expanded ? View.VISIBLE : View.GONE);
             emptyHistory.setVisibility(expanded && history.length() == 0 ? View.VISIBLE : View.GONE);
             clearHistoryButton.setVisibility(expanded && history.length() > 0 ? View.VISIBLE : View.GONE);
+            Set<String> keys = new HashSet<>();
+            for (int i = 0; i < history.length(); i++) keys.add(HistoryRepository.keyOf(history.getJSONObject(i)));
+            expandedEntries.retainAll(keys);
+            missingEntries.retainAll(keys);
             if (expanded) {
-                for (int i = 0; i < history.length(); i++) addItem(history.getJSONObject(i), i);
+                for (int i = 0; i < history.length(); i++) addItem(history.getJSONObject(i));
                 if (lastRenderedCount >= 0 && history.length() > lastRenderedCount && container.getChildCount() > 0) {
                     UiMotion.reveal(container.getChildAt(0), 10, 0);
                 }
@@ -87,8 +104,10 @@ final class HistoryController {
 
     void dispose() { uiHandler.removeCallbacks(refreshRunnable); }
 
-    private void addItem(JSONObject item, int position) throws Exception {
+    private void addItem(JSONObject item) throws Exception {
         View row = LayoutInflater.from(activity).inflate(R.layout.item_history, container, false);
+        String key = HistoryRepository.keyOf(item);
+        row.setTag(item);
         View itemHeader = row.findViewById(R.id.historyItemHeader);
         LinearLayout filesContainer = row.findViewById(R.id.historyFilesContainer);
         TextView expandIndicator = row.findViewById(R.id.itemExpandIndicator);
@@ -102,19 +121,16 @@ final class HistoryController {
         TextView title = row.findViewById(R.id.itemTitle);
         if (!username.isEmpty()) title.setText("@" + username);
         else title.setText(isCarousel ? R.string.history_item_carousel : R.string.history_item_content);
-        String downloadedAt = downloadAge(item.optLong("createdAt", 0L));
-        ((TextView) row.findViewById(R.id.itemMeta)).setText(isCarousel
-                ? quantity(R.plurals.history_file_count, files.length()) + " · " + downloadedAt
-                : activity.getString(labelFor(type)) + " · " + downloadedAt);
+        showMeta(row, item);
+        List<View> fileRows = new ArrayList<>();
         if (isCarousel && files.length() > 0) {
             expandIndicator.setVisibility(View.VISIBLE);
-            addFiles(filesContainer, files);
-            itemHeader.setContentDescription(activity.getString(R.string.history_files_expand));
-            itemHeader.setOnClickListener(v -> toggleFiles(itemHeader, filesContainer, expandIndicator));
+            fileRows = addFiles(filesContainer, files);
+            showFiles(itemHeader, filesContainer, expandIndicator, expandedEntries.contains(key));
+            itemHeader.setOnClickListener(v -> toggleFiles(key, itemHeader, filesContainer, expandIndicator));
         } else if (files.length() > 0) {
             JSONObject file = files.optJSONObject(0);
-            itemHeader.setContentDescription(activity.getString("photo".equals(type) ? R.string.history_open_photo
-                    : "story".equals(type) ? R.string.history_open_story : R.string.history_open_video));
+            itemHeader.setContentDescription(activity.getString("photo".equals(type) ? R.string.history_open_photo : R.string.history_open_video));
             itemHeader.setOnClickListener(v -> openFile(file));
         }
         Uri postUri = instagramPostUri(item.optString("url", null));
@@ -123,15 +139,22 @@ final class HistoryController {
             openPost.setVisibility(View.VISIBLE);
             openPost.setOnClickListener(v -> { UiMotion.tap(v); openPost(postUri); });
         }
-        row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeItem(position));
+        row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeItem(key));
         container.addView(row);
+        checkFiles(row, item, files, fileRows);
         String preview = item.optString("preview", null);
-        if (preview != null && !preview.isEmpty()) loadRemotePreview(row, preview);
+        if (preview != null && !preview.isEmpty()) {
+            imageLoader.loadInto(row.findViewById(R.id.itemPreview), preview, dp(activity, 42), imageExecutor,
+                    () -> row.findViewById(R.id.itemIcon).setVisibility(View.GONE));
+        }
     }
 
-    private void addFiles(LinearLayout filesContainer, JSONArray files) {
+    /** One row per file, at the file's index; null where the stored file is unreadable. */
+    private List<View> addFiles(LinearLayout filesContainer, JSONArray files) {
+        List<View> rows = new ArrayList<>();
         for (int i = 0; i < files.length(); i++) {
             JSONObject file = files.optJSONObject(i);
+            rows.add(null);
             if (file == null) continue;
             View child = LayoutInflater.from(activity).inflate(R.layout.item_history_file, filesContainer, false);
             String type = file.optString("type", "photo");
@@ -141,16 +164,38 @@ final class HistoryController {
             child.setContentDescription(activity.getString(R.string.history_open_file, name));
             child.setOnClickListener(v -> openFile(file));
             filesContainer.addView(child);
-            updateFileAvailability(child, file);
+            rows.set(i, child);
         }
+        return rows;
     }
 
-    private void toggleFiles(View header, LinearLayout files, TextView indicator) {
+    /** "Photo · 5 minutes ago", or "Photo · File not found" in the error color once the files are gone. */
+    private void showMeta(View row, JSONObject item) {
+        TextView meta = row.findViewById(R.id.itemMeta);
+        try {
+            String type = item.optString("type", "auto");
+            int fileCount = HistoryRepository.files(item).length();
+            boolean missing = missingEntries.contains(HistoryRepository.keyOf(item));
+            String state = missing ? activity.getString(fileCount > 1 ? R.string.history_files_not_found : R.string.history_file_not_found)
+                    : downloadAge(item.optLong("createdAt", 0L));
+            meta.setText(("carousel".equals(type) ? quantity(R.plurals.history_file_count, fileCount)
+                    : activity.getString(labelFor(type))) + " · " + state);
+            // STYLE: history row meta, muted or error when the files are gone (values/colors.xml).
+            meta.setTextColor(activity.getColor(missing ? R.color.error : R.color.muted));
+        } catch (Exception ignored) { }
+    }
+
+    private void toggleFiles(String key, View header, LinearLayout files, TextView indicator) {
         boolean expand = files.getVisibility() != View.VISIBLE;
-        files.setVisibility(expand ? View.VISIBLE : View.GONE);
+        if (expand) expandedEntries.add(key); else expandedEntries.remove(key);
+        showFiles(header, files, indicator, expand);
         if (expand) UiMotion.reveal(files, 8, 0);
-        indicator.setText(expand ? "▲" : "▼");
-        header.setContentDescription(activity.getString(expand ? R.string.history_files_collapse : R.string.history_files_expand));
+    }
+
+    private void showFiles(View header, LinearLayout files, TextView indicator, boolean expanded) {
+        files.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        indicator.setText(expanded ? "▲" : "▼");
+        header.setContentDescription(activity.getString(expanded ? R.string.history_files_collapse : R.string.history_files_expand));
     }
 
     private void setExpanded(boolean expanded) {
@@ -170,14 +215,30 @@ final class HistoryController {
                 }).show();
     }
 
-    private void removeItem(int position) {
+    private void removeItem(String key) {
         try {
-            repository.remove(position);
+            repository.remove(key);
             render();
             statusReporter.clear();
         } catch (Exception error) {
             statusReporter.show(activity.getString(R.string.history_remove_failed), true);
         }
+    }
+
+    /**
+     * Updates only the "n minutes ago" labels: a full render would rebuild every row and repeat the
+     * MediaStore lookups and thumbnail loads.
+     */
+    private void refreshAges() {
+        JSONArray shown = new JSONArray();
+        for (int i = 0; i < container.getChildCount(); i++) {
+            View row = container.getChildAt(i);
+            if (!(row.getTag() instanceof JSONObject)) continue;
+            JSONObject item = (JSONObject) row.getTag();
+            showMeta(row, item);
+            shown.put(item);
+        }
+        scheduleRefresh(shown);
     }
 
     private void scheduleRefresh(JSONArray history) {
@@ -194,67 +255,89 @@ final class HistoryController {
         if (nextRefresh != Long.MAX_VALUE) uiHandler.postDelayed(refreshRunnable, nextRefresh);
     }
 
-    private void loadRemotePreview(View row, String imageUrl) {
-        ImageView target = row.findViewById(R.id.itemPreview);
-        target.setTag(imageUrl);
+    /**
+     * Looks for an entry's files in the background, then marks the entry missing when none is on
+     * the device and none is still being saved, and updates its carousel file rows.
+     */
+    private void checkFiles(View row, JSONObject item, JSONArray files, List<View> fileRows) {
+        if (files.length() == 0) return;
+        String key = HistoryRepository.keyOf(item);
+        long createdAt = item.optLong("createdAt", 0L);
         imageExecutor.execute(() -> {
-            try {
-                Bitmap image = imageLoader.remoteThumbnail(imageUrl, dp(42), dp(42));
-                if (image != null) activity.runOnUiThread(() -> {
-                    if (!imageUrl.equals(target.getTag())) return;
-                    target.setImageBitmap(image);
-                    target.setVisibility(View.VISIBLE);
-                    UiMotion.fadeIn(target);
-                    row.findViewById(R.id.itemIcon).setVisibility(View.GONE);
-                });
-            } catch (Exception ignored) { }
-        });
-    }
-
-    private void updateFileAvailability(View row, JSONObject file) {
-        imageExecutor.execute(() -> {
-            Uri localFile = findLocalFile(file);
+            Uri[] found = new Uri[files.length()];
+            boolean[] saving = new boolean[files.length()];
+            boolean missing = true;
+            for (int i = 0; i < files.length(); i++) {
+                JSONObject file = files.optJSONObject(i);
+                if (file == null) continue;
+                found[i] = findLocalFile(file);
+                saving[i] = found[i] == null && isStillSaving(file, createdAt);
+                if (found[i] != null || saving[i]) missing = false;
+            }
+            boolean entryMissing = missing;
             activity.runOnUiThread(() -> {
-                TextView type = row.findViewById(R.id.historyFileType);
-                ImageView preview = row.findViewById(R.id.historyFilePreview);
-                if (localFile == null) {
-                    preview.setTag(null);
-                    preview.setVisibility(View.GONE);
-                    type.setText("");
-                    boolean isVideo = "video".equals(file.optString("type", "photo"));
-                    type.setCompoundDrawablesWithIntrinsicBounds(isVideo ? R.drawable.ic_video : R.drawable.ic_photo, 0, 0, 0);
-                    type.setContentDescription(activity.getString(isVideo ? R.string.history_file_video : R.string.history_file_photo));
-                    return;
+                if (entryMissing) missingEntries.add(key); else missingEntries.remove(key);
+                showMeta(row, item);
+                for (int i = 0; i < fileRows.size(); i++) {
+                    if (fileRows.get(i) != null) showFileState(fileRows.get(i), files.optJSONObject(i), found[i], saving[i]);
                 }
-                type.setCompoundDrawables(null, null, null, null);
-                if ("photo".equals(file.optString("type", "photo"))) loadLocalPreview(row, localFile);
             });
         });
     }
 
-    private void loadLocalPreview(View row, Uri imageUri) {
-        ImageView target = row.findViewById(R.id.historyFilePreview);
-        String imageKey = imageUri.toString();
-        target.setTag(imageKey);
-        imageExecutor.execute(() -> {
-            try {
-                Bitmap image = imageLoader.localThumbnail(imageUri, dp(36), dp(36));
-                if (image != null) activity.runOnUiThread(() -> {
-                    if (!imageKey.equals(target.getTag())) return;
-                    target.setImageBitmap(image);
-                    target.setVisibility(View.VISIBLE);
-                    UiMotion.fadeIn(target);
-                });
-            } catch (Exception ignored) { }
-        });
+    /** A saved file shows its thumbnail; one being saved, its type icon; a missing one says so. */
+    private void showFileState(View row, JSONObject file, Uri localFile, boolean saving) {
+        TextView type = row.findViewById(R.id.historyFileType);
+        ImageView preview = row.findViewById(R.id.historyFilePreview);
+        boolean isVideo = "video".equals(file.optString("type", "photo"));
+        if (localFile != null) {
+            type.setCompoundDrawables(null, null, null, null);
+            if (!isVideo) imageLoader.loadInto(preview, localFile, dp(activity, 36), imageExecutor, null);
+            return;
+        }
+        preview.setTag(null);
+        preview.setVisibility(View.GONE);
+        if (saving) {
+            type.setText("");
+            // STYLE: photo or video icon of a history file (drawable/ic_photo, drawable/ic_video).
+            type.setCompoundDrawablesWithIntrinsicBounds(isVideo ? R.drawable.ic_video : R.drawable.ic_photo, 0, 0, 0);
+            type.setContentDescription(activity.getString(isVideo ? R.string.history_file_video : R.string.history_file_photo));
+            return;
+        }
+        type.setCompoundDrawables(null, null, null, null);
+        type.setText(R.string.history_file_not_found);
+        type.setContentDescription(null);
+        // STYLE: label of a history file that is no longer on the device (values/colors.xml).
+        type.setTextColor(activity.getColor(R.color.error));
+    }
+
+    /**
+     * Videos report their state through DownloadManager. Photos have none: a missing photo counts as
+     * still being saved only while its entry is recent.
+     */
+    private boolean isStillSaving(JSONObject file, long createdAt) {
+        long downloadId = file.optLong("downloadId", -1L);
+        if ("video".equals(file.optString("type", "photo")) && downloadId >= 0) {
+            int status = downloadStatus(downloadId);
+            return status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_RUNNING
+                    || status == DownloadManager.STATUS_PAUSED;
+        }
+        return System.currentTimeMillis() - createdAt < PHOTO_SAVE_GRACE_MS;
+    }
+
+    private int downloadStatus(long downloadId) {
+        DownloadManager manager = (DownloadManager) activity.getSystemService(Activity.DOWNLOAD_SERVICE);
+        try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(downloadId))) {
+            if (cursor != null && cursor.moveToFirst()) return cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+        } catch (Exception ignored) { }
+        return -1;
     }
 
     /** The permalink without share-tracking parameters, or null for direct media links. */
     private static Uri instagramPostUri(String url) {
         if (url == null || url.isEmpty()) return null;
         Uri uri = Uri.parse(url);
-        String host = uri.getHost();
-        if (host == null || !(host.equals("instagram.com") || host.endsWith(".instagram.com"))) return null;
+        if (!MediaResolver.isInstagramHost(uri.getHost())) return null;
         return uri.buildUpon().clearQuery().fragment(null).build();
     }
 
@@ -290,15 +373,25 @@ final class HistoryController {
         String type = file.optString("type", "photo");
         long downloadId = file.optLong("downloadId", -1L);
         if (filename == null) return null;
-        Uri localFile = null;
         if ("video".equals(type) && downloadId >= 0) {
-            localFile = ((DownloadManager) activity.getSystemService(Activity.DOWNLOAD_SERVICE)).getUriForDownloadedFile(downloadId);
+            // DownloadManager keeps answering for a download whose file was deleted afterwards, so
+            // the file itself is opened to check it's still there.
+            Uri localFile = ((DownloadManager) activity.getSystemService(Activity.DOWNLOAD_SERVICE)).getUriForDownloadedFile(downloadId);
+            if (localFile != null && canOpen(localFile)) return localFile;
         }
-        return localFile != null ? localFile : findDownloadedFile(filename, type);
+        return findDownloadedFile(filename, type);
+    }
+
+    private boolean canOpen(Uri uri) {
+        try (ParcelFileDescriptor descriptor = activity.getContentResolver().openFileDescriptor(uri, "r")) {
+            return descriptor != null;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private Uri findDownloadedFile(String filename, String type) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return findLegacyFile(filename, type);
         String[] projection = {MediaStore.MediaColumns._ID};
         String selection = MediaStore.MediaColumns.DISPLAY_NAME + "=? AND " + MediaStore.MediaColumns.MIME_TYPE + " LIKE ?";
         String[] args = {filename, "video".equals(type) ? "video/%" : "image/%"};
@@ -312,7 +405,23 @@ final class HistoryController {
         return null;
     }
 
-    private int dp(int value) { return Math.round(value * activity.getResources().getDisplayMetrics().density); }
+    /**
+     * Android 9 and earlier have no MediaStore.Downloads: files are found by their path in the
+     * image or video table, filled by the media scanner. A content URI, unlike a file path, can be
+     * handed to a viewer app.
+     */
+    @SuppressWarnings("deprecation")
+    private Uri findLegacyFile(String filename, String type) {
+        Uri table = "video".equals(type) ? MediaStore.Video.Media.EXTERNAL_CONTENT_URI : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        String[] projection = {MediaStore.MediaColumns._ID};
+        String[] args = {DownloadController.legacyFile(filename).getAbsolutePath()};
+        try (Cursor cursor = activity.getContentResolver().query(table, projection, MediaStore.MediaColumns.DATA + "=?", args, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return ContentUris.withAppendedId(table, cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)));
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
 
     private String downloadAge(long createdAt) {
         if (createdAt <= 0L) return activity.getString(R.string.downloaded_previously);
@@ -330,7 +439,6 @@ final class HistoryController {
 
     private static int labelFor(String type) {
         if ("photo".equals(type)) return R.string.type_photo;
-        if ("story".equals(type)) return R.string.type_story;
         if ("carousel".equals(type)) return R.string.type_carousel;
         return R.string.type_video;
     }

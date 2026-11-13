@@ -14,6 +14,7 @@ import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.IBinder;
@@ -24,8 +25,12 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+
+import static app.instasave.UiMotion.dp;
 
 /** Keeps a draggable bubble above other apps; tapping it opens the quick download sheet. */
 public final class BubbleService extends Service {
@@ -41,6 +46,8 @@ public final class BubbleService extends Service {
     private FrameLayout bubble;
     private ImageView button;
     private ImageView dismissTarget;
+    /** The bubble is shrinking away before the service stops; a new start request brings it back. */
+    private boolean hiding;
 
     static boolean isEnabled() { return enabled; }
 
@@ -49,7 +56,16 @@ public final class BubbleService extends Service {
         context.startForegroundService(new Intent(context, BubbleService.class));
     }
 
-    static void stop(Context context) { context.stopService(new Intent(context, BubbleService.class)); }
+    /** Asks the service to shrink the bubble away and stop; nothing to do when it isn't running. */
+    static void stop(Context context) {
+        if (!enabled) return;
+        try {
+            context.startService(new Intent(context, BubbleService.class).setAction(ACTION_STOP));
+        } catch (Exception error) {
+            // Background start limits: stop it directly, without the animation.
+            context.stopService(new Intent(context, BubbleService.class));
+        }
+    }
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
@@ -62,7 +78,17 @@ public final class BubbleService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) stopSelf();
+        if (intent != null && ACTION_STOP.equals(intent.getAction())) { hideBubble(); return START_NOT_STICKY; }
+        // Every startForegroundService() call must be followed by startForeground(), also when the
+        // service is already running, or Android stops the app.
+        startInForeground();
+        if (hiding) {
+            // Switched back on while shrinking: cancelling the animation also skips its stopSelf().
+            hiding = false;
+            enabled = true;
+            showDismissTarget(false);
+            popIn();
+        }
         return START_STICKY;
     }
 
@@ -92,15 +118,16 @@ public final class BubbleService extends Service {
 
     // DragListener calls performClick() itself for taps, so the bubble stays reachable by TalkBack.
     @SuppressLint("ClickableViewAccessibility")
+    // STYLE: floating bubble: 56dp circle, drawable/bg_bubble with drawable/ic_bubble_download.
     private void showBubble() {
         windowManager = getSystemService(WindowManager.class);
-        int shadowSpace = dp(8);
-        int size = dp(56) + shadowSpace * 2;
+        int shadowSpace = dp(this, 8);
+        int size = dp(this, 56) + shadowSpace * 2;
         button = new ImageView(this);
         button.setImageResource(R.drawable.ic_bubble_download);
         button.setBackgroundResource(R.drawable.bg_bubble);
         button.setScaleType(ImageView.ScaleType.CENTER);
-        button.setElevation(dp(5));
+        button.setElevation(dp(this, 5));
         button.setContentDescription(getString(R.string.bubble_description));
         button.setOnClickListener(v -> openQuickDownload());
         button.setOnTouchListener(new DragListener());
@@ -117,10 +144,46 @@ public final class BubbleService extends Service {
         // Added first so it stays below the bubble, which can then be dropped onto it.
         addDismissTarget();
         windowManager.addView(bubble, params);
+        popIn();
     }
 
+    // STYLE: bubble entrance: pops out from nothing with a slight overshoot, 280ms.
+    private void popIn() {
+        button.animate().cancel();
+        button.setScaleX(1f);
+        button.setScaleY(1f);
+        button.setAlpha(1f);
+        if (!ValueAnimator.areAnimatorsEnabled()) return;
+        button.setScaleX(0f);
+        button.setScaleY(0f);
+        button.setAlpha(0f);
+        button.animate().scaleX(1f).scaleY(1f).alpha(1f).setStartDelay(0).setDuration(280)
+                .setInterpolator(new OvershootInterpolator(1.6f)).start();
+    }
+
+    /**
+     * Shrinks the bubble away, together with the drop target when it was dropped there, then stops
+     * the service. Every way of hiding the bubble goes through here: the drop target, the in-app
+     * switch and the notification action.
+     */
+    // STYLE: bubble exit: shrinks and fades out, 200ms.
+    private void hideBubble() {
+        if (hiding) return;
+        enabled = false;
+        if (bubble == null || !bubble.isAttachedToWindow() || !ValueAnimator.areAnimatorsEnabled()) { stopSelf(); return; }
+        hiding = true;
+        button.animate().cancel();
+        button.animate().scaleX(0f).scaleY(0f).alpha(0f).setStartDelay(0).setDuration(200)
+                .setInterpolator(new AccelerateInterpolator()).withEndAction(this::stopSelf).start();
+        if (dismissTarget.getVisibility() == View.VISIBLE) {
+            dismissTarget.animate().cancel();
+            dismissTarget.animate().scaleX(0f).scaleY(0f).alpha(0f).setDuration(200).start();
+        }
+    }
+
+    // STYLE: drop target to close the bubble: 64dp, drawable/bg_bubble_dismiss.
     private void addDismissTarget() {
-        int size = dp(64);
+        int size = dp(this, 64);
         dismissTarget = new ImageView(this);
         dismissTarget.setImageResource(R.drawable.ic_clear);
         dismissTarget.setImageTintList(ColorStateList.valueOf(Color.WHITE));
@@ -132,7 +195,7 @@ public final class BubbleService extends Service {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                 PixelFormat.TRANSLUCENT);
         target.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        target.y = dp(48);
+        target.y = dp(this, 48);
         windowManager.addView(dismissTarget, target);
     }
 
@@ -151,12 +214,22 @@ public final class BubbleService extends Service {
         dismissTarget.getLocationOnScreen(location);
         float centerX = location[0] + dismissTarget.getWidth() / 2f;
         float centerY = location[1] + dismissTarget.getHeight() / 2f;
-        return Math.hypot(rawX - centerX, rawY - centerY) < dp(72);
+        return Math.hypot(rawX - centerX, rawY - centerY) < dp(this, 72);
     }
 
     private void openQuickDownload() {
         UiMotion.tap(button);
-        startActivity(new Intent(this, QuickDownloadActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        // The button's place on screen, so the sheet can open its speech bubble next to it. Read from
+        // the window and the button's layout position, which the tap's scale animation doesn't change.
+        int[] window = new int[2];
+        bubble.getLocationOnScreen(window);
+        Rect bounds = new Rect(window[0] + button.getLeft(), window[1] + button.getTop(),
+                window[0] + button.getRight(), window[1] + button.getBottom());
+        // No system transition: a new task otherwise slides in, hiding the sheet's own animation.
+        Intent sheet = new Intent(this, QuickDownloadActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        sheet.setSourceBounds(bounds);
+        startActivity(sheet);
     }
 
     /** Moves the bubble to the nearest side, keeping it fully on screen; the shadow space acts as margin. */
@@ -186,8 +259,6 @@ public final class BubbleService extends Service {
         if (dismissTarget != null && dismissTarget.isAttachedToWindow()) windowManager.removeView(dismissTarget);
         super.onDestroy();
     }
-
-    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
     /**
      * Drags the bubble; a touch that never exceeds the touch slop is delivered as a click. Dropping
@@ -229,9 +300,9 @@ public final class BubbleService extends Service {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!dragging) { view.performClick(); return true; }
+                    if (overTarget) { hideBubble(); return true; }
                     showDismissTarget(false);
-                    if (overTarget) stopSelf();
-                    else snapToEdge();
+                    snapToEdge();
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     if (dragging) { showDismissTarget(false); snapToEdge(); }

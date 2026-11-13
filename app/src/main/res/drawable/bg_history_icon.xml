@@ -1,3 +1,6 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+<!-- STYLE: soft accent square behind the type icon of a history row when it has no thumbnail
+     (item_history.xml, itemIcon). Square like drawable/bg_thumbnail, so rows with and without a
+     thumbnail line up. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="@color/accent_soft" />
 </shape>

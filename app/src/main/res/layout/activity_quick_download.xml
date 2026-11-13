@@ -1,18 +1,32 @@
-<!-- Translucent sheet opened by the floating bubble; tapping outside the card closes it.
-     The card is centred because reading the clipboard makes Android show the "pasted from your
-     clipboard" toast near the bottom edge, which would otherwise cover the download button. -->
+<!-- STYLE: quick download sheet. Translucent screen opened by the floating bubble: the card is a
+     speech bubble placed next to the bubble by BubblePopover.java, which also keeps it clear of the
+     "pasted from your clipboard" toast at the bottom. Tapping outside the card closes it. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/quickRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/scrim">
+    android:clipChildren="false">
 
+    <!-- Veil over the app behind, color/scrim; fades in and out with the card. -->
+    <View
+        android:id="@+id/quickScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/scrim" />
+
+    <!-- BLOCK: speech bubble, the card plus its tail. Sizes and position are set in BubblePopover.java. -->
+    <FrameLayout
+        android:id="@+id/quickPopover"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:visibility="invisible">
+
+    <!-- Card, background drawable/bg_action_card. -->
     <LinearLayout
         android:id="@+id/quickCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_margin="12dp"
         android:background="@drawable/bg_action_card"
         android:clickable="true"
         android:focusable="false"
@@ -24,11 +38,12 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <!-- Thumbnail, background drawable/bg_thumbnail. -->
             <ImageView
                 android:id="@+id/quickPreview"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
-                android:background="@drawable/bg_history_icon"
+                android:background="@drawable/bg_thumbnail"
                 android:contentDescription="@string/preview_image"
                 android:scaleType="centerCrop" />
 
@@ -65,6 +80,7 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Download button, background drawable/bg_primary. -->
         <Button
             android:id="@+id/quickDownloadButton"
             android:layout_width="match_parent"
@@ -77,6 +93,7 @@
             android:textStyle="bold"
             android:visibility="gone" />
 
+        <!-- "Open in Instasave" text button. -->
         <TextView
             android:id="@+id/quickOpenAppButton"
             android:layout_width="match_parent"
@@ -91,4 +108,13 @@
             android:textStyle="bold"
             android:visibility="gone" />
     </LinearLayout>
+
+    <!-- Tail pointing at the bubble, drawable/bubble_tail. -->
+    <ImageView
+        android:id="@+id/quickTail"
+        android:layout_width="12dp"
+        android:layout_height="24dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/bubble_tail" />
+    </FrameLayout>
 </FrameLayout>
