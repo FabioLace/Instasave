@@ -12,7 +12,7 @@ Line numbers refer to the reviewed commit. Items marked **Fixed** have been addr
 
 ## Bugs
 
-### 1. Nothing can be saved on Android 8 and 9 (API 26–28)
+### 1. Nothing can be saved on Android 8 and 9 (API 26–28) — Fixed
 
 `minSdk` is 26, but every save path requires Android 10:
 
@@ -25,6 +25,12 @@ Line numbers refer to the reviewed commit. Items marked **Fixed** have been addr
 
 Fix: raise `minSdk` to 29, or add a legacy save path (with the storage permission) for API 26–28.
 At minimum, move the SDK check before the image download.
+
+**Fixed** with a legacy save path, keeping `minSdk` 26. The manifest declares `WRITE_EXTERNAL_STORAGE`
+with `maxSdkVersion="28"`, and both activities ask for it on the first download. Photos are written by
+path to `Download/Instasave` and handed to the media scanner. Videos are also scanned, and the history finds
+both in MediaStore by path. Verified on an Android 9 emulator (API 28), from the main screen and from the
+bubble's sheet.
 
 ### 2. Stale history, and removing an entry can delete the wrong one — Fixed
 
@@ -133,5 +139,5 @@ Fix: share one host check.
 ## Suggested order
 
 1. ~~Bugs 2, 3 and 4, and the `jpegName` duplicate: user-visible and small to fix.~~ Done.
-2. Bug 1: decide whether to raise `minSdk` to 29 or support API 26–28.
+2. ~~Bug 1: decide whether to raise `minSdk` to 29 or support API 26–28.~~ Done: API 26–28 are supported.
 3. Bugs 5–9, then the remaining duplicates and dead code.

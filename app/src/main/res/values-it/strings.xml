@@ -26,7 +26,7 @@
     <string name="error_unreadable">Impossibile leggere questo contenuto pubblico.</string>
     <string name="error_unavailable">Questo contenuto pubblico non è disponibile.</string>
     <string name="error_invalid_image">Il file ricevuto non è un\'immagine valida.</string>
-    <string name="error_jpeg_unsupported">Il salvataggio in JPEG richiede Android 10 o versioni successive.</string>
+    <string name="error_storage_permission">Consenti l\'accesso alla memoria per salvare foto e video su questa versione di Android.</string>
     <string name="error_jpeg_create">Impossibile creare il file JPEG.</string>
     <string name="error_jpeg_convert">Impossibile convertire l\'immagine in JPEG.</string>
 

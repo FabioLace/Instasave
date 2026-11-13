@@ -161,14 +161,16 @@ WALKS = [
          intro="Photos and videos take different routes, and the screen hears back once, when all of them are done.",
          excerpts=[excerpt("DownloadController.java", 'Map<MediaResolver.MediaItem, Long> start(List<MediaResolver.MediaItem> items)', [
              (0, 10, "`unfinished` counts the files still in flight. The returned map holds the DownloadManager IDs of the videos; the history stores them to find the files later."),
-             (11, 16, "Called by the activity's `BroadcastReceiver` when the system reports a finished download. IDs that belong to other apps are ignored."),
-             (17, 22, "Photos skip DownloadManager: they're re-encoded below."),
-             (23, 36, "Videos are queued in DownloadManager, which shows its own notification and carries on even if the app closes."),
+             (11, 24, "Android 9 and earlier write to the public Download folder directly, which needs the storage permission. Both activities check `needsStoragePermission()` and ask for it before calling `start()`."),
+             (25, 30, "Called by the activity's `BroadcastReceiver` when the system reports a finished download. IDs that belong to other apps are ignored."),
+             (31, 42, "If the permission was denied, every file fails with a message saying so. Photos skip DownloadManager: they're re-encoded below."),
+             (43, 58, "Videos are queued in DownloadManager, which shows its own notification and carries on even if the app closes. Below Android 10 they also need to be handed to the media scanner to reach the gallery."),
          ]), excerpt("DownloadController.java", 'private void savePhotoAsJpeg(MediaResolver.MediaItem item)', [
-             (0, 6, "On `saveExecutor`, the full image is fetched. Writing to Download through MediaStore needs Android 10."),
+             (0, 6, "On `saveExecutor`, the full image is fetched. Writing to Download through MediaStore needs Android 10, so earlier versions take the file route further down."),
              (7, 13, "`IS_PENDING` hides the file from other apps until it's complete."),
              (14, 20, "Compressed at quality 100, then made visible."),
              (21, 26, "A failed save removes the half-written entry."),
+             (27, 46, "Android 8 and 9: the photo is written by path, then the media scanner adds it to the gallery and to MediaStore, where the history finds it. The save counts as done only once the scan is over."),
          ]), excerpt("DownloadController.java", 'private void finish(boolean succeeded, String failureMessage)', [
              (0, 5, "Every file passes through here once, whether it succeeded or not. At zero the screen gets a single callback."),
          ])]),

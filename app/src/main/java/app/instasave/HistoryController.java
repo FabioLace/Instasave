@@ -3,6 +3,7 @@ package app.instasave;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
+import android.content.ContentUris;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -334,7 +335,7 @@ final class HistoryController {
     }
 
     private Uri findDownloadedFile(String filename, String type) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return findLegacyFile(filename, type);
         String[] projection = {MediaStore.MediaColumns._ID};
         String selection = MediaStore.MediaColumns.DISPLAY_NAME + "=? AND " + MediaStore.MediaColumns.MIME_TYPE + " LIKE ?";
         String[] args = {filename, "video".equals(type) ? "video/%" : "image/%"};
@@ -343,6 +344,24 @@ final class HistoryController {
             if (cursor != null && cursor.moveToFirst()) {
                 long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID));
                 return Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, Long.toString(id));
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
+
+    /**
+     * Android 9 and earlier have no MediaStore.Downloads: files are found by their path in the
+     * image or video table, filled by the media scanner. A content URI, unlike a file path, can be
+     * handed to a viewer app.
+     */
+    @SuppressWarnings("deprecation")
+    private Uri findLegacyFile(String filename, String type) {
+        Uri table = "video".equals(type) ? MediaStore.Video.Media.EXTERNAL_CONTENT_URI : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        String[] projection = {MediaStore.MediaColumns._ID};
+        String[] args = {DownloadController.legacyFile(filename).getAbsolutePath()};
+        try (Cursor cursor = activity.getContentResolver().query(table, projection, MediaStore.MediaColumns.DATA + "=?", args, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return ContentUris.withAppendedId(table, cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)));
             }
         } catch (Exception ignored) { }
         return null;

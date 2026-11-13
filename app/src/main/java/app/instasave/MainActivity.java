@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 /** Coordinates link analysis with the preview, download, and history components. */
 public final class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATIONS = 1;
+    private static final int REQUEST_STORAGE = 2;
     private static final String PROJECT_URL = "https://github.com/FabioLace/Instasave";
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
@@ -168,6 +169,10 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQUEST_NOTIFICATIONS) enableBubble();
+        if (requestCode == REQUEST_STORAGE) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) downloadPending();
+            else showStatus(R.string.error_storage_permission, true);
+        }
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -243,6 +248,11 @@ public final class MainActivity extends Activity {
         if (pendingResult == null) return;
         List<MediaResolver.MediaItem> selected = previewController.selectedItems(pendingResult);
         if (selected.isEmpty()) { showStatus(R.string.status_select_item, true); return; }
+        // Android 9 and earlier: asked on the first download, which resumes once it is granted.
+        if (DownloadController.needsStoragePermission(this)) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE);
+            return;
+        }
         downloadInProgress = true;
         previewController.updateDownloadButton(true, false);
         showStatus(selected.size() > 1 ? R.string.status_downloads_started : R.string.status_download_started, false);

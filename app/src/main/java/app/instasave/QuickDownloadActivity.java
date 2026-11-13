@@ -1,5 +1,6 @@
 package app.instasave;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
@@ -9,6 +10,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
@@ -26,6 +28,7 @@ import java.util.concurrent.Executors;
 
 /** Sheet opened by the floating bubble: downloads the link copied in Instagram without leaving it. */
 public final class QuickDownloadActivity extends Activity {
+    private static final int REQUEST_STORAGE = 1;
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor();
@@ -152,12 +155,24 @@ public final class QuickDownloadActivity extends Activity {
 
     private void download() {
         if (result == null) return;
+        // Android 9 and earlier: the system dialog only pauses the sheet, which stays open behind it.
+        if (DownloadController.needsStoragePermission(this)) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE);
+            return;
+        }
         downloadButton.setEnabled(false);
         downloadButton.setText(R.string.download_started);
         openAppButton.setVisibility(View.GONE);
         message.setText(result.items.size() > 1 ? R.string.status_downloads_started : R.string.status_download_started);
         Map<MediaResolver.MediaItem, Long> ids = downloadController.start(result.items);
         try { HistoryRepository.of(this).add(source, result, result.items, ids); } catch (Exception ignored) { }
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != REQUEST_STORAGE) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) download();
+        else showMessage(getString(R.string.error_storage_permission), true);
     }
 
     private void finishDownload(boolean failed, String failureMessage) {
