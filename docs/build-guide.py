@@ -198,7 +198,7 @@ WALKS = [
              (0, 9, "The starting point of the finger and of the window."),
              (10, 13, "Movements smaller than the system's touch slop still count as a tap."),
              (14, 24, "Once it's a drag, the window follows the finger and the ✕ appears, growing when the bubble is close enough."),
-             (25, 30, "A tap is delivered with `performClick()`, which keeps the bubble usable with TalkBack. Dropped on the ✕, the service stops; anywhere else, the bubble snaps to the nearest edge."),
+             (25, 30, "A tap is delivered with `performClick()`, which keeps the bubble usable with TalkBack. Dropped on the ✕, the bubble shrinks into it and the service stops; anywhere else, the bubble snaps to the nearest edge."),
              (31, 37, "A cancelled gesture snaps back too."),
          ])]),
     dict(id="clipboard", group="bubble", title="Reading the clipboard", shot="quick-sheet.jpg",

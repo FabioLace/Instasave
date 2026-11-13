@@ -25,6 +25,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
@@ -44,6 +46,8 @@ public final class BubbleService extends Service {
     private FrameLayout bubble;
     private ImageView button;
     private ImageView dismissTarget;
+    /** The bubble is shrinking away before the service stops; a new start request brings it back. */
+    private boolean hiding;
 
     static boolean isEnabled() { return enabled; }
 
@@ -52,7 +56,16 @@ public final class BubbleService extends Service {
         context.startForegroundService(new Intent(context, BubbleService.class));
     }
 
-    static void stop(Context context) { context.stopService(new Intent(context, BubbleService.class)); }
+    /** Asks the service to shrink the bubble away and stop; nothing to do when it isn't running. */
+    static void stop(Context context) {
+        if (!enabled) return;
+        try {
+            context.startService(new Intent(context, BubbleService.class).setAction(ACTION_STOP));
+        } catch (Exception error) {
+            // Background start limits: stop it directly, without the animation.
+            context.stopService(new Intent(context, BubbleService.class));
+        }
+    }
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
@@ -65,10 +78,17 @@ public final class BubbleService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
+        if (intent != null && ACTION_STOP.equals(intent.getAction())) { hideBubble(); return START_NOT_STICKY; }
         // Every startForegroundService() call must be followed by startForeground(), also when the
         // service is already running, or Android stops the app.
         startInForeground();
+        if (hiding) {
+            // Switched back on while shrinking: cancelling the animation also skips its stopSelf().
+            hiding = false;
+            enabled = true;
+            showDismissTarget(false);
+            popIn();
+        }
         return START_STICKY;
     }
 
@@ -124,6 +144,41 @@ public final class BubbleService extends Service {
         // Added first so it stays below the bubble, which can then be dropped onto it.
         addDismissTarget();
         windowManager.addView(bubble, params);
+        popIn();
+    }
+
+    // STYLE: bubble entrance: pops out from nothing with a slight overshoot, 280ms.
+    private void popIn() {
+        button.animate().cancel();
+        button.setScaleX(1f);
+        button.setScaleY(1f);
+        button.setAlpha(1f);
+        if (!ValueAnimator.areAnimatorsEnabled()) return;
+        button.setScaleX(0f);
+        button.setScaleY(0f);
+        button.setAlpha(0f);
+        button.animate().scaleX(1f).scaleY(1f).alpha(1f).setStartDelay(0).setDuration(280)
+                .setInterpolator(new OvershootInterpolator(1.6f)).start();
+    }
+
+    /**
+     * Shrinks the bubble away, together with the drop target when it was dropped there, then stops
+     * the service. Every way of hiding the bubble goes through here: the drop target, the in-app
+     * switch and the notification action.
+     */
+    // STYLE: bubble exit: shrinks and fades out, 200ms.
+    private void hideBubble() {
+        if (hiding) return;
+        enabled = false;
+        if (bubble == null || !bubble.isAttachedToWindow() || !ValueAnimator.areAnimatorsEnabled()) { stopSelf(); return; }
+        hiding = true;
+        button.animate().cancel();
+        button.animate().scaleX(0f).scaleY(0f).alpha(0f).setStartDelay(0).setDuration(200)
+                .setInterpolator(new AccelerateInterpolator()).withEndAction(this::stopSelf).start();
+        if (dismissTarget.getVisibility() == View.VISIBLE) {
+            dismissTarget.animate().cancel();
+            dismissTarget.animate().scaleX(0f).scaleY(0f).alpha(0f).setDuration(200).start();
+        }
     }
 
     // STYLE: drop target to close the bubble: 64dp, drawable/bg_bubble_dismiss.
@@ -205,7 +260,6 @@ public final class BubbleService extends Service {
         super.onDestroy();
     }
 
-
     /**
      * Drags the bubble; a touch that never exceeds the touch slop is delivered as a click. Dropping
      * the bubble on the target at the bottom hides it, like closing the service from the app.
@@ -246,9 +300,9 @@ public final class BubbleService extends Service {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!dragging) { view.performClick(); return true; }
+                    if (overTarget) { hideBubble(); return true; }
                     showDismissTarget(false);
-                    if (overTarget) stopSelf();
-                    else snapToEdge();
+                    snapToEdge();
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     if (dragging) { showDismissTarget(false); snapToEdge(); }
