@@ -19,6 +19,8 @@ import android.widget.TextView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 /** Renders and manages the persisted download history. */
@@ -38,7 +40,9 @@ final class HistoryController {
     private final TextView emptyHistory;
     private final TextView historyToggle;
     private final TextView clearHistoryButton;
-    private final Runnable refreshRunnable = this::render;
+    private final Runnable refreshRunnable = this::refreshAges;
+    /** Keys of the carousels whose file list is open, kept so a re-render doesn't close them. */
+    private final Set<String> expandedEntries = new HashSet<>();
     private int lastRenderedCount = -1;
 
     HistoryController(Activity activity, HistoryRepository repository, ImageLoader imageLoader,
@@ -71,8 +75,11 @@ final class HistoryController {
             container.setVisibility(expanded ? View.VISIBLE : View.GONE);
             emptyHistory.setVisibility(expanded && history.length() == 0 ? View.VISIBLE : View.GONE);
             clearHistoryButton.setVisibility(expanded && history.length() > 0 ? View.VISIBLE : View.GONE);
+            Set<String> keys = new HashSet<>();
+            for (int i = 0; i < history.length(); i++) keys.add(HistoryRepository.keyOf(history.getJSONObject(i)));
+            expandedEntries.retainAll(keys);
             if (expanded) {
-                for (int i = 0; i < history.length(); i++) addItem(history.getJSONObject(i), i);
+                for (int i = 0; i < history.length(); i++) addItem(history.getJSONObject(i));
                 if (lastRenderedCount >= 0 && history.length() > lastRenderedCount && container.getChildCount() > 0) {
                     UiMotion.reveal(container.getChildAt(0), 10, 0);
                 }
@@ -87,8 +94,10 @@ final class HistoryController {
 
     void dispose() { uiHandler.removeCallbacks(refreshRunnable); }
 
-    private void addItem(JSONObject item, int position) throws Exception {
+    private void addItem(JSONObject item) throws Exception {
         View row = LayoutInflater.from(activity).inflate(R.layout.item_history, container, false);
+        String key = HistoryRepository.keyOf(item);
+        row.setTag(item);
         View itemHeader = row.findViewById(R.id.historyItemHeader);
         LinearLayout filesContainer = row.findViewById(R.id.historyFilesContainer);
         TextView expandIndicator = row.findViewById(R.id.itemExpandIndicator);
@@ -102,15 +111,12 @@ final class HistoryController {
         TextView title = row.findViewById(R.id.itemTitle);
         if (!username.isEmpty()) title.setText("@" + username);
         else title.setText(isCarousel ? R.string.history_item_carousel : R.string.history_item_content);
-        String downloadedAt = downloadAge(item.optLong("createdAt", 0L));
-        ((TextView) row.findViewById(R.id.itemMeta)).setText(isCarousel
-                ? quantity(R.plurals.history_file_count, files.length()) + " · " + downloadedAt
-                : activity.getString(labelFor(type)) + " · " + downloadedAt);
+        ((TextView) row.findViewById(R.id.itemMeta)).setText(metaText(item));
         if (isCarousel && files.length() > 0) {
             expandIndicator.setVisibility(View.VISIBLE);
             addFiles(filesContainer, files);
-            itemHeader.setContentDescription(activity.getString(R.string.history_files_expand));
-            itemHeader.setOnClickListener(v -> toggleFiles(itemHeader, filesContainer, expandIndicator));
+            showFiles(itemHeader, filesContainer, expandIndicator, expandedEntries.contains(key));
+            itemHeader.setOnClickListener(v -> toggleFiles(key, itemHeader, filesContainer, expandIndicator));
         } else if (files.length() > 0) {
             JSONObject file = files.optJSONObject(0);
             itemHeader.setContentDescription(activity.getString("photo".equals(type) ? R.string.history_open_photo
@@ -123,7 +129,7 @@ final class HistoryController {
             openPost.setVisibility(View.VISIBLE);
             openPost.setOnClickListener(v -> { UiMotion.tap(v); openPost(postUri); });
         }
-        row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeItem(position));
+        row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeItem(key));
         container.addView(row);
         String preview = item.optString("preview", null);
         if (preview != null && !preview.isEmpty()) loadRemotePreview(row, preview);
@@ -145,12 +151,25 @@ final class HistoryController {
         }
     }
 
-    private void toggleFiles(View header, LinearLayout files, TextView indicator) {
+    private String metaText(JSONObject item) throws Exception {
+        String type = item.optString("type", "auto");
+        String downloadedAt = downloadAge(item.optLong("createdAt", 0L));
+        return "carousel".equals(type)
+                ? quantity(R.plurals.history_file_count, HistoryRepository.files(item).length()) + " · " + downloadedAt
+                : activity.getString(labelFor(type)) + " · " + downloadedAt;
+    }
+
+    private void toggleFiles(String key, View header, LinearLayout files, TextView indicator) {
         boolean expand = files.getVisibility() != View.VISIBLE;
-        files.setVisibility(expand ? View.VISIBLE : View.GONE);
+        if (expand) expandedEntries.add(key); else expandedEntries.remove(key);
+        showFiles(header, files, indicator, expand);
         if (expand) UiMotion.reveal(files, 8, 0);
-        indicator.setText(expand ? "▲" : "▼");
-        header.setContentDescription(activity.getString(expand ? R.string.history_files_collapse : R.string.history_files_expand));
+    }
+
+    private void showFiles(View header, LinearLayout files, TextView indicator, boolean expanded) {
+        files.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        indicator.setText(expanded ? "▲" : "▼");
+        header.setContentDescription(activity.getString(expanded ? R.string.history_files_collapse : R.string.history_files_expand));
     }
 
     private void setExpanded(boolean expanded) {
@@ -170,14 +189,30 @@ final class HistoryController {
                 }).show();
     }
 
-    private void removeItem(int position) {
+    private void removeItem(String key) {
         try {
-            repository.remove(position);
+            repository.remove(key);
             render();
             statusReporter.clear();
         } catch (Exception error) {
             statusReporter.show(activity.getString(R.string.history_remove_failed), true);
         }
+    }
+
+    /**
+     * Updates only the "n minutes ago" labels: a full render would rebuild every row and repeat the
+     * MediaStore lookups and thumbnail loads.
+     */
+    private void refreshAges() {
+        JSONArray shown = new JSONArray();
+        for (int i = 0; i < container.getChildCount(); i++) {
+            View row = container.getChildAt(i);
+            if (!(row.getTag() instanceof JSONObject)) continue;
+            JSONObject item = (JSONObject) row.getTag();
+            try { ((TextView) row.findViewById(R.id.itemMeta)).setText(metaText(item)); } catch (Exception ignored) { }
+            shown.put(item);
+        }
+        scheduleRefresh(shown);
     }
 
     private void scheduleRefresh(JSONArray history) {

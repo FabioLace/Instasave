@@ -53,6 +53,8 @@ public final class MainActivity extends Activity {
     private DownloadController downloadController;
     private MediaResolver.Result pendingResult;
     private String pendingSource;
+    /** Incremented by every analysis, so a slower earlier one can't touch the screen. */
+    private int resolveGeneration;
     private boolean downloadInProgress;
     private boolean downloadResetPending;
     private boolean downloadReceiverRegistered;
@@ -110,7 +112,6 @@ public final class MainActivity extends Activity {
             @Override public void afterTextChanged(Editable s) { }
         });
         receiveSharedLink(getIntent());
-        historyController.render();
         UiMotion.reveal(findViewById(R.id.appHeader), 8, 0);
         UiMotion.reveal(findViewById(R.id.linkCard), 14, 70);
     }
@@ -126,6 +127,9 @@ public final class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         bubbleSwitch.setChecked(BubbleService.isEnabled());
+        // Also covers the bubble's sheet: it is translucent, so this activity is only paused under it
+        // and onRestart() doesn't run, yet the sheet's downloads are written to the same history.
+        historyController.render();
     }
 
     // Runs when coming back from a full-screen activity, such as the overlay permission settings,
@@ -137,8 +141,6 @@ public final class MainActivity extends Activity {
             if (Settings.canDrawOverlays(this)) BubbleService.start(this);
             else showStatus(R.string.bubble_permission_denied, true);
         }
-        // Downloads started from the bubble are written to the same history while this activity is stopped.
-        historyController.render();
     }
 
     private void setBubbleEnabled(boolean enabled) {
@@ -198,20 +200,38 @@ public final class MainActivity extends Activity {
 
     private void resolveLink() {
         String source = urlInput.getText().toString().trim();
+        int generation = ++resolveGeneration;
         analyzeButton.setEnabled(false);
         showStatus(R.string.status_analyzing, false);
         resolverExecutor.execute(() -> {
             try {
                 MediaResolver.Result result = new MediaResolver().resolve(source);
-                runOnUiThread(() -> showResolvedResult(source, result));
+                runOnUiThread(() -> showResolvedResult(generation, source, result));
             } catch (Exception error) {
-                runOnUiThread(() -> { showStatus(UserFacingException.messageFor(this, error), true); analyzeButton.setEnabled(true); });
+                runOnUiThread(() -> showResolveError(generation, source, error));
             }
         });
     }
 
-    private void showResolvedResult(String source, MediaResolver.Result result) {
-        if (!source.equals(urlInput.getText().toString().trim())) return;
+    /**
+     * False when a newer analysis has started, which owns the screen, or when the link was edited
+     * meanwhile: then the "Analyzing…" status is cleared, and the button is left to the text watcher.
+     */
+    private boolean isCurrentAnalysis(int generation, String source) {
+        if (generation != resolveGeneration) return false;
+        if (source.equals(urlInput.getText().toString().trim())) return true;
+        clearStatus();
+        return false;
+    }
+
+    private void showResolveError(int generation, String source, Exception error) {
+        if (!isCurrentAnalysis(generation, source)) return;
+        showStatus(UserFacingException.messageFor(this, error), true);
+        analyzeButton.setEnabled(true);
+    }
+
+    private void showResolvedResult(int generation, String source, MediaResolver.Result result) {
+        if (!isCurrentAnalysis(generation, source)) return;
         pendingResult = result;
         pendingSource = source;
         previewController.show(result, downloadInProgress);

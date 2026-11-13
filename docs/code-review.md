@@ -8,7 +8,7 @@ The findings come from reading the code: the app was not built and the scenarios
 on an emulator. Findings marked **(plausible)** depend on platform behavior that still needs to be
 confirmed.
 
-Line numbers refer to the reviewed commit.
+Line numbers refer to the reviewed commit. Items marked **Fixed** have been addressed since.
 
 ## Bugs
 
@@ -26,7 +26,7 @@ Line numbers refer to the reviewed commit.
 Fix: raise `minSdk` to 29, or add a legacy save path (with the storage permission) for API 26–28.
 At minimum, move the SDK check before the image download.
 
-### 2. Stale history, and removing an entry can delete the wrong one
+### 2. Stale history, and removing an entry can delete the wrong one — Fixed
 
 The bubble's sheet uses a translucent theme (`Theme.Instasave.QuickDownload`). When it opens over
 `MainActivity`, the activity is only paused, so `onRestart()` (`MainActivity.java:133`) does not run and
@@ -37,7 +37,10 @@ while each row's remove button still deletes by its old index (`HistoryControlle
 Fix: re-render in `onResume()` (or listen for changes to the shared preferences), and remove entries
 by a stable key such as `createdAt` instead of their position.
 
-### 3. The once-a-minute refresh collapses expanded carousels
+**Fixed:** the history is re-rendered in `onResume()`, and entries are removed by their stored JSON,
+which also identifies legacy entries without `createdAt`.
+
+### 3. The once-a-minute refresh collapses expanded carousels — Fixed
 
 `scheduleRefresh` (`HistoryController.java:183`) calls `render()`, which runs `removeAllViews()` and
 inflates every row again. While any entry is less than an hour old, a carousel file list the user
@@ -46,13 +49,19 @@ thumbnail loads for every file.
 
 Fix: update only the age labels on refresh, or keep the expanded state across renders.
 
-### 4. Status stuck on "Analyzing…"
+**Fixed:** both. The minute refresh only rewrites the age labels, and open carousels stay open when the
+list is rebuilt (for example on `onResume()`, which now re-renders it).
+
+### 4. Status stuck on "Analyzing…" — Fixed
 
 If the URL changes while an analysis is running, `showResolvedResult` (`MainActivity.java:214`)
 discards the result but leaves the status unchanged. The error branch (`:208`) does not check `source`
 at all, so it shows the error of a link that is no longer in the field.
 
 Fix: check the source in both branches and clear the status when the result is stale.
+
+**Fixed:** both branches go through one check. A generation counter also drops the result of an earlier
+analysis once a newer one has started, so it can't overwrite that one's status.
 
 ### 5. The specific failure message is lost
 
@@ -102,7 +111,7 @@ Fix: share one host check.
 
 | Duplicate | Where | Proposal |
 |---|---|---|
-| `.jpg` file name | `DownloadController.jpegFilename:120`, `HistoryRepository.jpegName:58` | One function. If the two drift apart, the history can no longer find saved photos. |
+| `.jpg` file name | `DownloadController.jpegFilename:120`, `HistoryRepository.jpegName:58` | **Fixed:** the history calls `DownloadController.jpegFilename`. |
 | Error message fallback | `DownloadController.errorMessage:125`, `UserFacingException.messageFor:19` | Use `messageFor`. |
 | Download receiver and its registration | `MainActivity:62-66, 118-124`, `QuickDownloadActivity:47-51, 75-81` | Move into `DownloadController` (`register()` / `unregister()`). |
 | Reading a link from the clipboard | `MainActivity.pasteLink:186`, `QuickDownloadActivity.clipboardLink:98` | One helper that returns the link or null. |
@@ -123,6 +132,6 @@ Fix: share one host check.
 
 ## Suggested order
 
-1. Bugs 2, 3 and 4, and the `jpegName` duplicate: user-visible and small to fix.
+1. ~~Bugs 2, 3 and 4, and the `jpegName` duplicate: user-visible and small to fix.~~ Done.
 2. Bug 1: decide whether to raise `minSdk` to 29 or support API 26–28.
 3. Bugs 5–9, then the remaining duplicates and dead code.

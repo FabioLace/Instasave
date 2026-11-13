@@ -117,7 +117,8 @@ final class DownloadController {
         if (unfinished == 0) listener.onFinished(failed, failureMessage);
     }
 
-    private static String jpegFilename(String filename) {
+    /** The name a photo is saved under; the history stores it to find the file again. */
+    static String jpegFilename(String filename) {
         int dot = filename.lastIndexOf('.');
         return (dot > 0 ? filename.substring(0, dot) : filename) + ".jpg";
     }
