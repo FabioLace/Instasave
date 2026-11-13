@@ -202,11 +202,11 @@ WALKS = [
              (31, 37, "A cancelled gesture snaps back too."),
          ])]),
     dict(id="clipboard", group="bubble", title="Reading the clipboard", shot="quick-sheet.jpg",
-         shot_alt="The quick download sheet over the home screen: the reel's cover, Video ready, a Download button and an Open in Instasave link.",
+         shot_alt="The bubble's speech bubble next to it on the home screen: the reel's cover, Video ready, a Download button and an Open in Instasave link.",
          intro="The reason the bubble opens an activity at all: since Android 10, only the focused app can read the clipboard.",
          excerpts=[excerpt("QuickDownloadActivity.java", '@Override public void onWindowFocusChanged(boolean hasFocus) {', [
-             (0, 11, "Focus arrives after `onResume()`, so the clipboard is read here, once."),
-             (13, 17, "The same clipboard reading and link rules as the main screen's paste button, borrowed from `MainActivity`."),
+             (0, 12, "Focus arrives after `onResume()`, once the window is on screen, so the clipboard is read here, once. It's also when the speech bubble starts growing: an animation started earlier would be over before the window appears."),
+             (13, 18, "The same clipboard reading and link rules as the main screen's paste button, borrowed from `MainActivity`."),
          ]), excerpt("QuickDownloadActivity.java", '@Override protected void onStop() {', [
              (0, 3, "The sheet closes as soon as the user leaves it, so the next tap on the bubble reads the clipboard again."),
              (5, 13, "`shutdown()` rather than `shutdownNow()` lets a photo that's being saved finish after the sheet is gone."),
@@ -298,7 +298,7 @@ INFO = {
         text="Rebuilds the whole history list on every change: with five entries at most, that's simpler than a `RecyclerView`. It checks in the background whether each file still exists, and marks an entry *not found* in red once its files are gone and none is still being saved. It updates the age labels every minute while an entry is less than an hour old. Open carousels stay open across rebuilds.",
         walks=["history"]),
     "QuickDownloadActivity": dict(file="QuickDownloadActivity.java", shot="quick-sheet.jpg",
-        text="The translucent sheet the bubble opens. It downloads every item at once; Open in Instasave hands the link to `MainActivity` to pick carousel items one by one.",
+        text="The translucent screen the bubble opens. `BubblePopover` places its card next to the bubble as a speech bubble and grows it out of the bubble and back. It downloads every item at once; Open in Instasave hands the link to `MainActivity`, which analyzes it right away, to pick carousel items one by one.",
         walks=["clipboard"]),
     "MediaResolver": dict(file="MediaResolver.java",
         text="Turns a link into files. It reads the data Instagram embeds in its own pages, which is undocumented, so this is the class that breaks when Instagram changes.",

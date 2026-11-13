@@ -34,6 +34,8 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATIONS = 1;
     private static final int REQUEST_STORAGE = 2;
     private static final String PROJECT_URL = "https://github.com/FabioLace/Instasave";
+    /** Set by the bubble's "Open in Instasave": the shared link is analyzed right away, not only pasted. */
+    static final String EXTRA_ANALYZE = "app.instasave.extra.ANALYZE";
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(3);
     private final ExecutorService metadataExecutor = Executors.newFixedThreadPool(2);
@@ -101,7 +103,8 @@ public final class MainActivity extends Activity {
             }
             @Override public void afterTextChanged(Editable s) { }
         });
-        receiveSharedLink(getIntent());
+        // A recreated activity gets its old intent again; analyzing it once more would be unexpected.
+        receiveSharedLink(getIntent(), state == null);
         UiMotion.reveal(findViewById(R.id.appHeader), 8, 0);
         UiMotion.reveal(findViewById(R.id.linkCard), 14, 70);
     }
@@ -159,16 +162,17 @@ public final class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        receiveSharedLink(intent);
+        receiveSharedLink(intent, true);
     }
 
-    private void receiveSharedLink(Intent intent) {
+    private void receiveSharedLink(Intent intent, boolean mayAnalyze) {
         if (!Intent.ACTION_SEND.equals(intent.getAction()) || !"text/plain".equals(intent.getType())) return;
         String shared = intent.getStringExtra(Intent.EXTRA_TEXT);
         if (shared == null) return;
         urlInput.setText(extractUrl(shared));
         urlInput.setSelection(urlInput.length());
         clearStatus();
+        if (mayAnalyze && intent.getBooleanExtra(EXTRA_ANALYZE, false) && analyzeButton.isEnabled()) resolveLink();
     }
 
     private void pasteLink() {

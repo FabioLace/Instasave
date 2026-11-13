@@ -14,6 +14,7 @@ import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.IBinder;
@@ -163,7 +164,17 @@ public final class BubbleService extends Service {
 
     private void openQuickDownload() {
         UiMotion.tap(button);
-        startActivity(new Intent(this, QuickDownloadActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        // The button's place on screen, so the sheet can open its speech bubble next to it. Read from
+        // the window and the button's layout position, which the tap's scale animation doesn't change.
+        int[] window = new int[2];
+        bubble.getLocationOnScreen(window);
+        Rect bounds = new Rect(window[0] + button.getLeft(), window[1] + button.getTop(),
+                window[0] + button.getRight(), window[1] + button.getBottom());
+        // No system transition: a new task otherwise slides in, hiding the sheet's own animation.
+        Intent sheet = new Intent(this, QuickDownloadActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        sheet.setSourceBounds(bounds);
+        startActivity(sheet);
     }
 
     /** Moves the bubble to the nearest side, keeping it fully on screen; the shadow space acts as margin. */

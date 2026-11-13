@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,7 +25,7 @@ public final class QuickDownloadActivity extends Activity {
     private final ExecutorService imageExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
-    private View card;
+    private BubblePopover popover;
     private ImageView preview;
     private TextView title;
     private TextView message;
@@ -39,8 +40,12 @@ public final class QuickDownloadActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        // BubblePopover animates the card itself; Android 14+ ignores the theme's window animations.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0);
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0);
+        }
         setContentView(R.layout.activity_quick_download);
-        card = findViewById(R.id.quickCard);
         preview = findViewById(R.id.quickPreview);
         title = findViewById(R.id.quickTitle);
         message = findViewById(R.id.quickMessage);
@@ -51,18 +56,28 @@ public final class QuickDownloadActivity extends Activity {
         downloadController = new DownloadController(this, saveExecutor, this::finishDownload);
         downloadController.register();
 
-        findViewById(R.id.quickRoot).setOnClickListener(v -> finish());
+        popover = new BubblePopover(findViewById(R.id.quickRoot), findViewById(R.id.quickScrim),
+                findViewById(R.id.quickPopover), findViewById(R.id.quickCard), findViewById(R.id.quickTail),
+                getIntent().getSourceBounds());
+        findViewById(R.id.quickScrim).setOnClickListener(v -> close());
         downloadButton.setOnClickListener(v -> { UiMotion.tap(v); download(); });
         openAppButton.setOnClickListener(v -> openInApp());
         showState(R.string.history_item_content, getString(R.string.status_analyzing), false);
         progress.setVisibility(View.VISIBLE);
-        UiMotion.reveal(card, 24, 0);
+        popover.show();
     }
+
+    /** Shrinks the speech bubble back into the bubble, then closes the sheet. */
+    private void close() { popover.dismiss(this::finish); }
+
+    @SuppressWarnings("deprecation")
+    @Override public void onBackPressed() { close(); }
 
     // Since Android 10 the clipboard is readable only by the app that has input focus, which this
     // activity gets after onResume(); reading it any earlier returns nothing.
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) popover.onWindowShown();
         if (!hasFocus || clipboardRead) return;
         clipboardRead = true;
         source = clipboardLink();
@@ -134,7 +149,7 @@ public final class QuickDownloadActivity extends Activity {
             return;
         }
         showMessage(getString(R.string.status_download_completed), false);
-        uiHandler.postDelayed(this::finish, 1_500L);
+        uiHandler.postDelayed(this::close, 1_500L);
     }
 
     /** Hands the link to the full app, where carousel items can be picked one by one. */
@@ -143,6 +158,7 @@ public final class QuickDownloadActivity extends Activity {
                 .setAction(Intent.ACTION_SEND)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_TEXT, source)
+                .putExtra(MainActivity.EXTRA_ANALYZE, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
         finish();
     }
