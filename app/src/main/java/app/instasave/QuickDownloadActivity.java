@@ -1,18 +1,9 @@
 package app.instasave;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -45,13 +36,6 @@ public final class QuickDownloadActivity extends Activity {
     private String source;
     private MediaResolver.Result result;
     private boolean clipboardRead;
-    private boolean downloadReceiverRegistered;
-
-    private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-            downloadController.handleCompleted(intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L));
-        }
-    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -65,7 +49,7 @@ public final class QuickDownloadActivity extends Activity {
         openAppButton = findViewById(R.id.quickOpenAppButton);
         imageLoader = new ImageLoader(getContentResolver());
         downloadController = new DownloadController(this, saveExecutor, this::finishDownload);
-        registerDownloadReceiver();
+        downloadController.register();
 
         findViewById(R.id.quickRoot).setOnClickListener(v -> finish());
         downloadButton.setOnClickListener(v -> { UiMotion.tap(v); download(); });
@@ -73,14 +57,6 @@ public final class QuickDownloadActivity extends Activity {
         showState(R.string.history_item_content, getString(R.string.status_analyzing), false);
         progress.setVisibility(View.VISIBLE);
         UiMotion.reveal(card, 24, 0);
-    }
-
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void registerDownloadReceiver() {
-        IntentFilter downloads = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) registerReceiver(downloadReceiver, downloads, Context.RECEIVER_EXPORTED);
-        else registerReceiver(downloadReceiver, downloads);
-        downloadReceiverRegistered = true;
     }
 
     // Since Android 10 the clipboard is readable only by the app that has input focus, which this
@@ -99,12 +75,9 @@ public final class QuickDownloadActivity extends Activity {
     }
 
     private String clipboardLink() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        ClipData clip = clipboard == null ? null : clipboard.getPrimaryClip();
-        if (clip == null || clip.getItemCount() == 0) return null;
-        CharSequence content = clip.getItemAt(0).coerceToText(this);
-        String link = content == null ? "" : MainActivity.extractUrl(content.toString());
-        return MainActivity.isValidUrl(link) ? link : null;
+        String content = MainActivity.clipboardText(this);
+        String link = content == null ? null : MainActivity.extractUrl(content);
+        return link != null && MainActivity.isValidUrl(link) ? link : null;
     }
 
     private void resolve() {
@@ -124,33 +97,12 @@ public final class QuickDownloadActivity extends Activity {
     private void showResult(MediaResolver.Result resolved) {
         result = resolved;
         int count = resolved.items.size();
-        boolean video = "video".equals(resolved.type);
-        showState(count > 1 ? R.string.preview_carousel_ready : video ? R.string.preview_video_ready : R.string.preview_photo_ready,
-                sourceLabel(resolved, count, video), false);
+        showState(PreviewController.readyTitle(resolved), PreviewController.sourceLabel(this, resolved), false);
         downloadButton.setText(count > 1 ? getString(R.string.quick_download_all, count) : getString(R.string.download_action));
         downloadButton.setVisibility(View.VISIBLE);
         openAppButton.setVisibility(View.VISIBLE);
         String previewUrl = resolved.items.get(0).previewUrl;
-        if (previewUrl != null) loadPreview(previewUrl);
-    }
-
-    /** The author when the response exposed it, like the main screen's preview; otherwise the generic source. */
-    private String sourceLabel(MediaResolver.Result resolved, int count, boolean video) {
-        if (resolved.username == null) {
-            return count > 1 ? getString(R.string.preview_items_source, count)
-                    : getString(video ? R.string.preview_video_source : R.string.preview_photo_source);
-        }
-        return count > 1 ? getString(R.string.preview_items_by, count, resolved.username) : "@" + resolved.username;
-    }
-
-    private void loadPreview(String imageUrl) {
-        int size = preview.getLayoutParams().width;
-        imageExecutor.execute(() -> {
-            try {
-                Bitmap bitmap = imageLoader.remoteThumbnail(imageUrl, size, size);
-                if (bitmap != null) runOnUiThread(() -> { preview.setImageBitmap(bitmap); UiMotion.fadeIn(preview); });
-            } catch (Exception ignored) { }
-        });
+        if (previewUrl != null) imageLoader.loadInto(preview, previewUrl, preview.getLayoutParams().width, imageExecutor, null);
     }
 
     private void download() {
@@ -215,7 +167,7 @@ public final class QuickDownloadActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
-        if (downloadReceiverRegistered) unregisterReceiver(downloadReceiver);
+        downloadController.unregister();
         uiHandler.removeCallbacksAndMessages(null);
         resolverExecutor.shutdownNow();
         imageExecutor.shutdownNow();

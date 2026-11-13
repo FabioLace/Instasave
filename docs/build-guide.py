@@ -160,9 +160,9 @@ WALKS = [
     dict(id="saving", group="download", title="Saving photos and videos",
          intro="Photos and videos take different routes, and the screen hears back once, when all of them are done.",
          excerpts=[excerpt("DownloadController.java", 'Map<MediaResolver.MediaItem, Long> start(List<MediaResolver.MediaItem> items)', [
-             (0, 10, "`unfinished` counts the files still in flight. The returned map holds the DownloadManager IDs of the videos; the history stores them to find the files later."),
-             (11, 24, "Android 9 and earlier write to the public Download folder directly, which needs the storage permission. Both activities check `needsStoragePermission()` and ask for it before calling `start()`."),
-             (25, 30, "Called by the activity's `BroadcastReceiver` when the system reports a finished download. IDs that belong to other apps are ignored."),
+             (0, 11, "`unfinished` counts the files still in flight. The returned map holds the DownloadManager IDs of the videos; the history stores them to find the files later."),
+             (12, 25, "Android 9 and earlier write to the public Download folder directly, which needs the storage permission. Both activities check `needsStoragePermission()` and ask for it before calling `start()`."),
+             (26, 30, "Called by the controller's own `BroadcastReceiver`, which the activity turns on and off with `register()` and `unregister()`, when the system reports a finished download. IDs that belong to other apps are ignored."),
              (31, 42, "If the permission was denied, every file fails with a message saying so. Photos skip DownloadManager: they're re-encoded below."),
              (43, 58, "Videos are queued in DownloadManager, which shows its own notification and carries on even if the app closes. Below Android 10 they also need to be handed to the media scanner to reach the gallery."),
          ]), excerpt("DownloadController.java", 'private void savePhotoAsJpeg(MediaResolver.MediaItem item)', [
@@ -206,7 +206,7 @@ WALKS = [
          intro="The reason the bubble opens an activity at all: since Android 10, only the focused app can read the clipboard.",
          excerpts=[excerpt("QuickDownloadActivity.java", '@Override public void onWindowFocusChanged(boolean hasFocus) {', [
              (0, 11, "Focus arrives after `onResume()`, so the clipboard is read here, once."),
-             (13, 20, "The same link rules as the main screen, borrowed from `MainActivity`."),
+             (13, 17, "The same clipboard reading and link rules as the main screen's paste button, borrowed from `MainActivity`."),
          ]), excerpt("QuickDownloadActivity.java", '@Override protected void onStop() {', [
              (0, 3, "The sheet closes as soon as the user leaves it, so the next tap on the bubble reads the clipboard again."),
              (5, 13, "`shutdown()` rather than `shutdownNow()` lets a photo that's being saved finish after the sheet is gone."),
@@ -307,10 +307,10 @@ INFO = {
         text="One `HEAD` request per file to show its size, and a partial `GET` for photos whose dimensions are unknown. Failures are silent: the details just don't appear.",
         walks=[]),
     "ImageLoader": dict(file="ImageLoader.java",
-        text="Downloads thumbnails and decodes them at the size they're shown, with a memory cache of at most 16 MB. `fetchOriginal()` returns the full image for saving.",
+        text="Downloads thumbnails and decodes them at the size they're shown, with a memory cache of at most 16 MB per screen. `loadInto()` puts one in a view, unless the view has asked for another image meanwhile. `fetchOriginal()` returns the full image for saving.",
         walks=[]),
     "DownloadController": dict(file="DownloadController.java",
-        text="Photos are re-encoded as JPEG and written through MediaStore; videos are handed to DownloadManager. It counts completions and calls back once.",
+        text="Photos are re-encoded as JPEG and written through MediaStore; videos are handed to DownloadManager, whose completion broadcasts it receives itself. It counts completions and calls back once.",
         walks=["saving"]),
     "HistoryRepository": dict(file="HistoryRepository.java",
         text="The whole history is one JSON string in SharedPreferences, newest first, five entries at most. The bubble's sheet writes to the same file.",

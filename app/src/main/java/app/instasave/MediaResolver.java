@@ -106,7 +106,7 @@ final class MediaResolver {
         if (isDirectMediaUrl(requestedUrl)) {
             String type = requestedUrl.toLowerCase(Locale.ROOT).contains(".mp4") ? "video" : "photo";
             String extension = type.equals("photo") ? ".jpg" : extensionFor(requestedUrl, ".mp4");
-            MediaItem item = new MediaItem(requestedUrl, "instasave_" + System.currentTimeMillis() + extension,
+            MediaItem item = new MediaItem(requestedUrl, FILENAME_PREFIX + System.currentTimeMillis() + extension,
                     type, type.equals("photo") ? requestedUrl : null);
             return new Result(Collections.singletonList(item));
         }
@@ -185,7 +185,7 @@ final class MediaResolver {
         String videoUrl = openGraphContent(html, "og:video:secure_url");
         if (videoUrl == null) videoUrl = openGraphContent(html, "og:video");
         if (videoUrl != null) {
-            String filename = "instasave_" + System.currentTimeMillis() + extensionFor(videoUrl, ".mp4");
+            String filename = FILENAME_PREFIX + System.currentTimeMillis() + extensionFor(videoUrl, ".mp4");
             String previewUrl = singleCoverOnly ? items.get(0).previewUrl : null;
             return new Result(Collections.singletonList(new MediaItem(videoUrl, filename, "video", previewUrl)),
                     username);
@@ -196,7 +196,7 @@ final class MediaResolver {
         // public embed exposes the post image and its responsive sources, including the largest one.
         String imageUrl = imageFromPublicEmbed(embedHtml);
         if (imageUrl == null) return null;
-        String filename = "instasave_" + System.currentTimeMillis() + ".jpg";
+        String filename = FILENAME_PREFIX + System.currentTimeMillis() + ".jpg";
         MediaItem cover = new MediaItem(imageUrl, filename, "photo", imageUrl);
         // The embed image of a reel is its cover, never the content the user asked for.
         cover.videoMissing = videoExpected || (embedHtml != null && embedDeclaresVideo(embedHtml));
@@ -252,12 +252,9 @@ final class MediaResolver {
     }
 
     private static String fetchHtml(String url) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new java.net.URL(url).openConnection();
-        connection.setConnectTimeout(10_000);
-        connection.setReadTimeout(15_000);
+        HttpURLConnection connection = Http.open(url, 15_000);
         connection.setRequestMethod("GET");
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
         connection.setRequestProperty("Accept", "text/html,application/xhtml+xml");
         StringBuilder body = new StringBuilder();
         try {
@@ -452,7 +449,7 @@ final class MediaResolver {
         String url = isVideo ? video.url : displayUrl;
         if (url == null) return;
         String type = isVideo ? "video" : "photo";
-        String filename = "instasave_" + System.currentTimeMillis() + "_" + index
+        String filename = FILENAME_PREFIX + System.currentTimeMillis() + "_" + index
                 + (type.equals("video") ? extensionFor(url, ".mp4") : ".jpg");
         String sourceId = mediaIdOf(node);
         double duration = isVideo ? node.optDouble("video_duration", node.optDouble("duration", 0)) : 0;
@@ -624,10 +621,6 @@ final class MediaResolver {
     private static boolean isDirectMediaUrl(String url) {
         String clean = url.toLowerCase(Locale.ROOT).split("\\?")[0];
         return clean.endsWith(".jpg") || clean.endsWith(".jpeg") || clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".mp4");
-    }
-
-    private static String extensionFor(String url) {
-        return extensionFor(url, ".mp4");
     }
 
     private static String extensionFor(String url, String fallback) {

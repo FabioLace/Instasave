@@ -1,15 +1,11 @@
 package app.instasave;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -58,15 +54,8 @@ public final class MainActivity extends Activity {
     private int resolveGeneration;
     private boolean downloadInProgress;
     private boolean downloadResetPending;
-    private boolean downloadReceiverRegistered;
     private boolean notificationsRequested;
     private boolean overlayPermissionRequested;
-
-    private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-            downloadController.handleCompleted(intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L));
-        }
-    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -88,7 +77,7 @@ public final class MainActivity extends Activity {
                     @Override public void clear() { clearStatus(); }
                 });
         downloadController = new DownloadController(this, saveExecutor, this::finishDownload);
-        registerDownloadReceiver();
+        downloadController.register();
 
         analyzeButton.setOnClickListener(v -> { UiMotion.tap(v); resolveLink(); });
         pasteButton.setOnClickListener(v -> { UiMotion.tap(v); pasteLink(); });
@@ -115,14 +104,6 @@ public final class MainActivity extends Activity {
         receiveSharedLink(getIntent());
         UiMotion.reveal(findViewById(R.id.appHeader), 8, 0);
         UiMotion.reveal(findViewById(R.id.linkCard), 14, 70);
-    }
-
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void registerDownloadReceiver() {
-        IntentFilter downloads = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) registerReceiver(downloadReceiver, downloads, Context.RECEIVER_EXPORTED);
-        else registerReceiver(downloadReceiver, downloads);
-        downloadReceiverRegistered = true;
     }
 
     @Override protected void onResume() {
@@ -191,12 +172,9 @@ public final class MainActivity extends Activity {
     }
 
     private void pasteLink() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (clipboard == null || !clipboard.hasPrimaryClip()) { showStatus(R.string.status_clipboard_empty, true); return; }
-        ClipData clip = clipboard.getPrimaryClip();
-        if (clip == null || clip.getItemCount() == 0) { showStatus(R.string.status_clipboard_empty, true); return; }
-        CharSequence content = clip.getItemAt(0).coerceToText(this);
-        String link = content == null ? "" : extractUrl(content.toString());
+        String content = clipboardText(this);
+        if (content == null) { showStatus(R.string.status_clipboard_empty, true); return; }
+        String link = extractUrl(content);
         if (!isValidUrl(link)) { showStatus(R.string.status_clipboard_invalid, true); return; }
         urlInput.setText(link);
         urlInput.setSelection(urlInput.length());
@@ -292,6 +270,15 @@ public final class MainActivity extends Activity {
         statusText.setVisibility(View.GONE);
     }
 
+    /** The text of the clipboard's first item, or null when it holds nothing. Also used by the bubble's sheet. */
+    static String clipboardText(Context context) {
+        ClipboardManager clipboard = (ClipboardManager) context.getSystemService(CLIPBOARD_SERVICE);
+        ClipData clip = clipboard == null ? null : clipboard.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) return null;
+        CharSequence content = clip.getItemAt(0).coerceToText(context);
+        return content == null ? null : content.toString();
+    }
+
     static boolean isValidUrl(String raw) {
         try {
             Uri uri = Uri.parse(extractUrl(raw));
@@ -308,7 +295,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         if (isFinishing()) urlInput.setText("");
-        if (downloadReceiverRegistered) unregisterReceiver(downloadReceiver);
+        downloadController.unregister();
         historyController.dispose();
         uiHandler.removeCallbacksAndMessages(null);
         resolverExecutor.shutdownNow();

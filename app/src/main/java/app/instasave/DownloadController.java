@@ -1,10 +1,14 @@
 package app.instasave;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -37,6 +41,12 @@ final class DownloadController {
     private final Executor saveExecutor;
     private final Listener listener;
     private final Set<Long> activeIds = new HashSet<>();
+    private final BroadcastReceiver completions = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            handleCompleted(intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L));
+        }
+    };
+    private boolean registered;
     private int unfinished;
     private boolean failed;
     /** The first specific reason a file failed; later failures don't replace it. */
@@ -46,6 +56,24 @@ final class DownloadController {
         this.activity = activity;
         this.saveExecutor = saveExecutor;
         this.listener = listener;
+    }
+
+    /** Starts listening for finished videos; the owning activity calls it in onCreate(). */
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    void register() {
+        if (registered) return;
+        IntentFilter downloads = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        // DownloadManager runs in another process, so the receiver must be exported to hear it.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) activity.registerReceiver(completions, downloads, Context.RECEIVER_EXPORTED);
+        else activity.registerReceiver(completions, downloads);
+        registered = true;
+    }
+
+    /** Stops listening; the owning activity calls it in onDestroy(). */
+    void unregister() {
+        if (!registered) return;
+        activity.unregisterReceiver(completions);
+        registered = false;
     }
 
     Map<MediaResolver.MediaItem, Long> start(List<MediaResolver.MediaItem> items) {
@@ -75,10 +103,9 @@ final class DownloadController {
         return new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), FOLDER + "/" + filename);
     }
 
-    boolean handleCompleted(long id) {
-        if (!activeIds.remove(id)) return false;
-        finish(downloadSucceeded(id), null);
-        return true;
+    /** Every app's finished downloads are broadcast; IDs this controller didn't start are ignored. */
+    private void handleCompleted(long id) {
+        if (activeIds.remove(id)) finish(downloadSucceeded(id), null);
     }
 
     @SuppressWarnings("deprecation")
@@ -104,7 +131,7 @@ final class DownloadController {
             activeIds.add(id);
             return id;
         } catch (Exception error) {
-            finish(false, errorMessage(error));
+            finish(false, UserFacingException.messageFor(activity, error));
             return -1L;
         }
     }
@@ -132,7 +159,7 @@ final class DownloadController {
                 activity.runOnUiThread(() -> finish(true, null));
             } catch (Exception error) {
                 if (destination != null) activity.getContentResolver().delete(destination, null, null);
-                activity.runOnUiThread(() -> finish(false, errorMessage(error)));
+                activity.runOnUiThread(() -> finish(false, UserFacingException.messageFor(activity, error)));
             }
         });
     }
@@ -179,10 +206,5 @@ final class DownloadController {
     static String jpegFilename(String filename) {
         int dot = filename.lastIndexOf('.');
         return (dot > 0 ? filename.substring(0, dot) : filename) + ".jpg";
-    }
-
-    private String errorMessage(Exception error) {
-        String message = error.getMessage();
-        return message == null || message.trim().isEmpty() ? activity.getString(R.string.error_generic) : message;
     }
 }

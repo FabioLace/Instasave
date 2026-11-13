@@ -6,7 +6,6 @@ import android.app.DownloadManager;
 import android.content.ContentUris;
 import android.content.Intent;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -23,6 +22,8 @@ import org.json.JSONObject;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Executor;
+
+import static app.instasave.UiMotion.dp;
 
 /** Renders and manages the persisted download history. */
 final class HistoryController {
@@ -120,8 +121,7 @@ final class HistoryController {
             itemHeader.setOnClickListener(v -> toggleFiles(key, itemHeader, filesContainer, expandIndicator));
         } else if (files.length() > 0) {
             JSONObject file = files.optJSONObject(0);
-            itemHeader.setContentDescription(activity.getString("photo".equals(type) ? R.string.history_open_photo
-                    : "story".equals(type) ? R.string.history_open_story : R.string.history_open_video));
+            itemHeader.setContentDescription(activity.getString("photo".equals(type) ? R.string.history_open_photo : R.string.history_open_video));
             itemHeader.setOnClickListener(v -> openFile(file));
         }
         Uri postUri = instagramPostUri(item.optString("url", null));
@@ -133,7 +133,10 @@ final class HistoryController {
         row.findViewById(R.id.removeHistoryItem).setOnClickListener(v -> removeItem(key));
         container.addView(row);
         String preview = item.optString("preview", null);
-        if (preview != null && !preview.isEmpty()) loadRemotePreview(row, preview);
+        if (preview != null && !preview.isEmpty()) {
+            imageLoader.loadInto(row.findViewById(R.id.itemPreview), preview, dp(activity, 42), imageExecutor,
+                    () -> row.findViewById(R.id.itemIcon).setVisibility(View.GONE));
+        }
     }
 
     private void addFiles(LinearLayout filesContainer, JSONArray files) {
@@ -230,23 +233,6 @@ final class HistoryController {
         if (nextRefresh != Long.MAX_VALUE) uiHandler.postDelayed(refreshRunnable, nextRefresh);
     }
 
-    private void loadRemotePreview(View row, String imageUrl) {
-        ImageView target = row.findViewById(R.id.itemPreview);
-        target.setTag(imageUrl);
-        imageExecutor.execute(() -> {
-            try {
-                Bitmap image = imageLoader.remoteThumbnail(imageUrl, dp(42), dp(42));
-                if (image != null) activity.runOnUiThread(() -> {
-                    if (!imageUrl.equals(target.getTag())) return;
-                    target.setImageBitmap(image);
-                    target.setVisibility(View.VISIBLE);
-                    UiMotion.fadeIn(target);
-                    row.findViewById(R.id.itemIcon).setVisibility(View.GONE);
-                });
-            } catch (Exception ignored) { }
-        });
-    }
-
     private void updateFileAvailability(View row, JSONObject file) {
         imageExecutor.execute(() -> {
             Uri localFile = findLocalFile(file);
@@ -264,25 +250,10 @@ final class HistoryController {
                     return;
                 }
                 type.setCompoundDrawables(null, null, null, null);
-                if ("photo".equals(file.optString("type", "photo"))) loadLocalPreview(row, localFile);
+                if ("photo".equals(file.optString("type", "photo"))) {
+                    imageLoader.loadInto(row.findViewById(R.id.historyFilePreview), localFile, dp(activity, 36), imageExecutor, null);
+                }
             });
-        });
-    }
-
-    private void loadLocalPreview(View row, Uri imageUri) {
-        ImageView target = row.findViewById(R.id.historyFilePreview);
-        String imageKey = imageUri.toString();
-        target.setTag(imageKey);
-        imageExecutor.execute(() -> {
-            try {
-                Bitmap image = imageLoader.localThumbnail(imageUri, dp(36), dp(36));
-                if (image != null) activity.runOnUiThread(() -> {
-                    if (!imageKey.equals(target.getTag())) return;
-                    target.setImageBitmap(image);
-                    target.setVisibility(View.VISIBLE);
-                    UiMotion.fadeIn(target);
-                });
-            } catch (Exception ignored) { }
         });
     }
 
@@ -366,8 +337,6 @@ final class HistoryController {
         return null;
     }
 
-    private int dp(int value) { return Math.round(value * activity.getResources().getDisplayMetrics().density); }
-
     private String downloadAge(long createdAt) {
         if (createdAt <= 0L) return activity.getString(R.string.downloaded_previously);
         long elapsedMinutes = Math.max(0L, System.currentTimeMillis() - createdAt) / 60_000L;
@@ -384,7 +353,6 @@ final class HistoryController {
 
     private static int labelFor(String type) {
         if ("photo".equals(type)) return R.string.type_photo;
-        if ("story".equals(type)) return R.string.type_story;
         if ("carousel".equals(type)) return R.string.type_carousel;
         return R.string.type_video;
     }

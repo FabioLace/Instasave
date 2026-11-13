@@ -33,7 +33,6 @@
     <!-- Media types -->
     <string name="type_photo">Photo</string>
     <string name="type_video">Video</string>
-    <string name="type_story">Story</string>
     <string name="type_carousel">Carousel</string>
     <string name="type_multi">Multi</string>
 
@@ -91,7 +90,6 @@
     </plurals>
     <string name="history_open_photo">Open downloaded photo</string>
     <string name="history_open_video">Open downloaded video</string>
-    <string name="history_open_story">Open downloaded story</string>
     <string name="history_open_file">Open %1$s</string>
     <string name="history_open_post">Open the original post on Instagram</string>
     <string name="history_open_post_failed">No app can open this Instagram link.</string>

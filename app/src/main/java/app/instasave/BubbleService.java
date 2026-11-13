@@ -27,6 +27,8 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
+import static app.instasave.UiMotion.dp;
+
 /** Keeps a draggable bubble above other apps; tapping it opens the quick download sheet. */
 public final class BubbleService extends Service {
     private static final String ACTION_STOP = "app.instasave.action.STOP_BUBBLE";
@@ -98,13 +100,13 @@ public final class BubbleService extends Service {
     // STYLE: floating bubble: 56dp circle, drawable/bg_bubble with drawable/ic_bubble_download.
     private void showBubble() {
         windowManager = getSystemService(WindowManager.class);
-        int shadowSpace = dp(8);
-        int size = dp(56) + shadowSpace * 2;
+        int shadowSpace = dp(this, 8);
+        int size = dp(this, 56) + shadowSpace * 2;
         button = new ImageView(this);
         button.setImageResource(R.drawable.ic_bubble_download);
         button.setBackgroundResource(R.drawable.bg_bubble);
         button.setScaleType(ImageView.ScaleType.CENTER);
-        button.setElevation(dp(5));
+        button.setElevation(dp(this, 5));
         button.setContentDescription(getString(R.string.bubble_description));
         button.setOnClickListener(v -> openQuickDownload());
         button.setOnTouchListener(new DragListener());
@@ -125,7 +127,7 @@ public final class BubbleService extends Service {
 
     // STYLE: drop target to close the bubble: 64dp, drawable/bg_bubble_dismiss.
     private void addDismissTarget() {
-        int size = dp(64);
+        int size = dp(this, 64);
         dismissTarget = new ImageView(this);
         dismissTarget.setImageResource(R.drawable.ic_clear);
         dismissTarget.setImageTintList(ColorStateList.valueOf(Color.WHITE));
@@ -137,7 +139,7 @@ public final class BubbleService extends Service {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                 PixelFormat.TRANSLUCENT);
         target.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        target.y = dp(48);
+        target.y = dp(this, 48);
         windowManager.addView(dismissTarget, target);
     }
 
@@ -156,7 +158,7 @@ public final class BubbleService extends Service {
         dismissTarget.getLocationOnScreen(location);
         float centerX = location[0] + dismissTarget.getWidth() / 2f;
         float centerY = location[1] + dismissTarget.getHeight() / 2f;
-        return Math.hypot(rawX - centerX, rawY - centerY) < dp(72);
+        return Math.hypot(rawX - centerX, rawY - centerY) < dp(this, 72);
     }
 
     private void openQuickDownload() {
@@ -192,7 +194,6 @@ public final class BubbleService extends Service {
         super.onDestroy();
     }
 
-    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
     /**
      * Drags the bubble; a touch that never exceeds the touch slop is delivered as a click. Dropping

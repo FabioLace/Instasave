@@ -133,26 +133,29 @@ Fix: share one host check.
 | Duplicate | Where | Proposal |
 |---|---|---|
 | `.jpg` file name | `DownloadController.jpegFilename:120`, `HistoryRepository.jpegName:58` | **Fixed:** the history calls `DownloadController.jpegFilename`. |
-| Error message fallback | `DownloadController.errorMessage:125`, `UserFacingException.messageFor:19` | Use `messageFor`. |
-| Download receiver and its registration | `MainActivity:62-66, 118-124`, `QuickDownloadActivity:47-51, 75-81` | Move into `DownloadController` (`register()` / `unregister()`). |
-| Reading a link from the clipboard | `MainActivity.pasteLink:186`, `QuickDownloadActivity.clipboardLink:98` | One helper that returns the link or null. |
-| HTTP connection setup and User-Agent (4 times) | `ImageLoader:52` and `:75` (nearly identical), `MediaProbe:16`, `MediaResolver:254` | One `openConnection(url, readTimeout)` helper. |
-| `"instasave_" + System.currentTimeMillis()` (4 times) | `MediaResolver:109, 187, 198, 452` | Use `FILENAME_PREFIX`. `Result` relies on `startsWith(FILENAME_PREFIX)`, so changing one literal silently breaks the renaming. |
-| `dp()` (3 times) | `BubbleService:192`, `PreviewController:275`, `HistoryController:316` | One shared static helper. |
-| Preview title and source label | `PreviewController.show:67` + `refreshDetails:206-214`, `QuickDownloadActivity.showResult:125` + `sourceLabel:135` | One method used by both screens. |
-| Async image load with tag check | `PreviewController.loadImage:253`, `HistoryController:197` and `:236`, `QuickDownloadActivity:143` | One `ImageLoader.loadInto(...)`. |
+| Error message fallback | `DownloadController.errorMessage:125`, `UserFacingException.messageFor:19` | **Fixed:** `messageFor` is used. |
+| Download receiver and its registration | `MainActivity:62-66, 118-124`, `QuickDownloadActivity:47-51, 75-81` | **Fixed:** `DownloadController.register()` / `unregister()`. |
+| Reading a link from the clipboard | `MainActivity.pasteLink:186`, `QuickDownloadActivity.clipboardLink:98` | **Fixed:** `MainActivity.clipboardText()` returns the text, so the paste button can still tell an empty clipboard from an invalid link. |
+| HTTP connection setup and User-Agent (4 times) | `ImageLoader:52` and `:75` (nearly identical), `MediaProbe:16`, `MediaResolver:254` | **Fixed:** `Http.open(url, readTimeout)`. `MediaProbe` now shares the 10 s connect timeout instead of 8 s. |
+| `"instasave_" + System.currentTimeMillis()` (4 times) | `MediaResolver:109, 187, 198, 452` | **Fixed:** `FILENAME_PREFIX` everywhere. |
+| `dp()` (3 times) | `BubbleService:192`, `PreviewController:275`, `HistoryController:316` | **Fixed:** `UiMotion.dp(context, value)`. |
+| Preview title and source label | `PreviewController.show:67` + `refreshDetails:206-214`, `QuickDownloadActivity.showResult:125` + `sourceLabel:135` | **Fixed:** `PreviewController.readyTitle()` and `sourceLabel()`. |
+| Async image load with tag check | `PreviewController.loadImage:253`, `HistoryController:197` and `:236`, `QuickDownloadActivity:143` | **Fixed:** `ImageLoader.loadInto(...)`, for remote and local images. |
 | Instagram host check | `MediaResolver:639`, `HistoryController:258` | **Fixed** with bug 9. |
 
 ## Dead or misleading code
 
-- `MediaResolver.extensionFor(String)` (`:626`) is never called.
+- `MediaResolver.extensionFor(String)` (`:626`) is never called. **Removed.**
 - The `"story"` type (`HistoryController:117, 334`, strings `type_story` and `history_open_story`) is
-  never produced by the resolver.
-- `PreviewController.loadPreview` and `loadThumbnail` (`:250-251`) only forward to `loadImage`.
-- The `ImageLoader` class comment mentions a "shared" cache, but each activity creates its own.
+  never produced by the resolver. **Removed:** only the first version of the app produced it, from a manual
+  type selector, and the history keeps five entries.
+- `PreviewController.loadPreview` and `loadThumbnail` (`:250-251`) only forward to `loadImage`. **Removed** with
+  the image loading duplicate.
+- The `ImageLoader` class comment mentions a "shared" cache, but each activity creates its own. **Fixed:** the
+  comment now says the cache is per screen.
 
 ## Suggested order
 
 1. ~~Bugs 2, 3 and 4, and the `jpegName` duplicate: user-visible and small to fix.~~ Done.
 2. ~~Bug 1: decide whether to raise `minSdk` to 29 or support API 26–28.~~ Done: API 26–28 are supported.
-3. ~~Bugs 5–9~~ Done. Then the remaining duplicates and dead code.
+3. ~~Bugs 5–9, then the remaining duplicates and dead code.~~ Done.
