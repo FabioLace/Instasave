@@ -69,21 +69,28 @@ Fix: check the source in both branches and clear the status when the result is s
 **Fixed:** both branches go through one check. A generation counter also drops the result of an earlier
 analysis once a newer one has started, so it can't overwrite that one's status.
 
-### 5. The specific failure message is lost
+### 5. The specific failure message is lost — Fixed
 
 `DownloadController.finish` (`:113-118`) hands the listener only the message of the last item to
 finish. If the first item fails and the last succeeds, the user sees the generic message.
 
 Fix: keep the first non-null failure message.
 
-### 6. Rotating `MainActivity` resets the screen
+**Fixed** as proposed. Not reproduced at runtime: it needs one item of a carousel to fail.
+
+### 6. Rotating `MainActivity` resets the screen — Fixed
 
 There is no `onSaveInstanceState` and no `configChanges`. On rotation the preview and `pendingResult`
 are lost, the download receiver is unregistered, and `saveExecutor.shutdownNow()` (`:287`) interrupts
 photo saves. `QuickDownloadActivity` uses `shutdown()` precisely so saves can finish, so the two
 activities are inconsistent.
 
-### 7. Foreground service crash on a second start (plausible)
+**Fixed:** `MainActivity` declares the same orientation and size `configChanges` as the sheet, so rotation
+no longer recreates it (verified on the emulator with a preview shown), and `saveExecutor` uses `shutdown()`.
+Other recreations, such as a dark mode switch or process death, still reset the screen: surviving them would
+need the analysis result to be saved in the instance state.
+
+### 7. Foreground service crash on a second start (plausible) — Fixed
 
 `BubbleService.onStartCommand` (`:64`) does not call `startForeground`. If `startForegroundService`
 is called again while the service is already running, Android can kill the app with
@@ -91,14 +98,19 @@ is called again while the service is already running, Android can kill the app w
 
 Fix: also call `startInForeground()` from `onStartCommand`.
 
-### 8. Shared links followed by a line break
+**Fixed** as proposed; the stop action now returns `START_NOT_STICKY`. Starting and stopping the bubble was
+verified; the crash itself was not reproduced.
+
+### 8. Shared links followed by a line break — Fixed
 
 `extractUrl` (`MainActivity.java:275`) cuts the URL only at a space. Shared text like
 `URL\nText with spaces` yields a URL that contains `\nText`, which is then rejected.
 
 Fix: cut at any whitespace (`\\s`).
 
-### 9. Inconsistent Instagram host checks
+**Fixed** and verified with a shared link followed by a caption line.
+
+### 9. Inconsistent Instagram host checks — Fixed
 
 `MediaResolver.isInstagramPermalink` (`:639`) accepts only `instagram.com` and `www.instagram.com`,
 so `m.instagram.com` links are rejected. `HistoryController.instagramPostUri` (`:258`) accepts any
@@ -106,10 +118,13 @@ so `m.instagram.com` links are rejected. `HistoryController.instagramPostUri` (`
 
 Fix: share one host check.
 
+**Fixed:** `MediaResolver.isInstagramHost` accepts `instagram.com`, `www.` and `m.`, and the history uses it.
+`m.` links are rewritten to `www` before the analysis; verified with a reel.
+
 ### 10. Minor
 
 - `MediaResolver.fetchHtml` (`:261`): on a non-200 response the connection is not closed, because the
-  `finally` with `disconnect()` only opens after the status check.
+  `finally` with `disconnect()` only opens after the status check. **Fixed:** the check is inside the `try`.
 - `MediaResolver.lacksVideo` (`:222`): one video that arrived without its file fails the whole carousel.
   This is intentional, but the user also loses the valid photos.
 
@@ -126,7 +141,7 @@ Fix: share one host check.
 | `dp()` (3 times) | `BubbleService:192`, `PreviewController:275`, `HistoryController:316` | One shared static helper. |
 | Preview title and source label | `PreviewController.show:67` + `refreshDetails:206-214`, `QuickDownloadActivity.showResult:125` + `sourceLabel:135` | One method used by both screens. |
 | Async image load with tag check | `PreviewController.loadImage:253`, `HistoryController:197` and `:236`, `QuickDownloadActivity:143` | One `ImageLoader.loadInto(...)`. |
-| Instagram host check | `MediaResolver:639`, `HistoryController:258` | See bug 9. |
+| Instagram host check | `MediaResolver:639`, `HistoryController:258` | **Fixed** with bug 9. |
 
 ## Dead or misleading code
 
@@ -140,4 +155,4 @@ Fix: share one host check.
 
 1. ~~Bugs 2, 3 and 4, and the `jpegName` duplicate: user-visible and small to fix.~~ Done.
 2. ~~Bug 1: decide whether to raise `minSdk` to 29 or support API 26–28.~~ Done: API 26–28 are supported.
-3. Bugs 5–9, then the remaining duplicates and dead code.
+3. ~~Bugs 5–9~~ Done. Then the remaining duplicates and dead code.

@@ -39,6 +39,8 @@ final class DownloadController {
     private final Set<Long> activeIds = new HashSet<>();
     private int unfinished;
     private boolean failed;
+    /** The first specific reason a file failed; later failures don't replace it. */
+    private String failureMessage;
 
     DownloadController(Activity activity, Executor saveExecutor, Listener listener) {
         this.activity = activity;
@@ -49,6 +51,7 @@ final class DownloadController {
     Map<MediaResolver.MediaItem, Long> start(List<MediaResolver.MediaItem> items) {
         unfinished = items.size();
         failed = false;
+        failureMessage = null;
         activeIds.clear();
         Map<MediaResolver.MediaItem, Long> ids = new HashMap<>();
         for (MediaResolver.MediaItem item : items) {
@@ -162,9 +165,12 @@ final class DownloadController {
         } catch (Exception ignored) { return false; }
     }
 
-    private void finish(boolean succeeded, String failureMessage) {
+    private void finish(boolean succeeded, String message) {
         if (unfinished <= 0) return;
-        if (!succeeded) failed = true;
+        if (!succeeded) {
+            failed = true;
+            if (failureMessage == null) failureMessage = message;
+        }
         unfinished--;
         if (unfinished == 0) listener.onFinished(failed, failureMessage);
     }

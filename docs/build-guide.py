@@ -127,12 +127,12 @@ WALKS = [
          ])]),
     dict(id="resolve", group="download", title="resolve(), top to bottom",
          intro="The entry point of the whole analysis. Most of its length handles responses that Instagram serves inconsistently.",
-         excerpts=[excerpt("MediaResolver.java", 'Result resolve(String sourceUrl) throws Exception {', [
+         excerpts=[excerpt("MediaResolver.java", 'Result resolve(String requestedUrl) throws Exception {', [
              (0, 7, "A direct link to a file needs no analysis: it becomes a single item as is."),
-             (8, 11, "Anything that isn't instagram.com stops here with a translated error."),
-             (12, 28, "The post page and the `/embed/` page are fetched at the same time. They don't always carry the same versions of a file, so both are needed."),
-             (29, 45, "Reels and `/tv/` links must produce a video. When the page arrives without its media data, it's fetched again, at most twice, waiting longer each time."),
-             (46, 50, "An explicit error is better than a reel's cover saved as if it were the reel."),
+             (8, 12, "Anything that isn't instagram.com stops here with a translated error. `isInstagramHost()` is the same check the history uses; `m.instagram.com` links are moved to `www`, the host the parsing was written against."),
+             (13, 29, "The post page and the `/embed/` page are fetched at the same time. They don't always carry the same versions of a file, so both are needed."),
+             (30, 46, "Reels and `/tv/` links must produce a video. When the page arrives without its media data, it's fetched again, at most twice, waiting longer each time."),
+             (47, 51, "An explicit error is better than a reel's cover saved as if it were the reel."),
          ])]),
     dict(id="json", group="download", title="Where the data hides",
          intro="Instagram embeds the post's data as JSON, in a different place depending on the response. `findMediaNode()` tries them in order, then `searchForMediaNode()` digs the post out.",
@@ -171,8 +171,8 @@ WALKS = [
              (14, 20, "Compressed at quality 100, then made visible."),
              (21, 26, "A failed save removes the half-written entry."),
              (27, 46, "Android 8 and 9: the photo is written by path, then the media scanner adds it to the gallery and to MediaStore, where the history finds it. The save counts as done only once the scan is over."),
-         ]), excerpt("DownloadController.java", 'private void finish(boolean succeeded, String failureMessage)', [
-             (0, 5, "Every file passes through here once, whether it succeeded or not. At zero the screen gets a single callback."),
+         ]), excerpt("DownloadController.java", 'private void finish(boolean succeeded, String message)', [
+             (0, 8, "Every file passes through here once, whether it succeeded or not. The first specific failure message is kept, so a later file can't replace it with nothing. At zero the screen gets a single callback."),
          ])]),
     dict(id="history", group="download", title="The history is one string",
          intro="Downloads are recorded when they start, not when they finish, as a JSON array in SharedPreferences.",

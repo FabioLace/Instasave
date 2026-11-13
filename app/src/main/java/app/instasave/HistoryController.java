@@ -290,8 +290,7 @@ final class HistoryController {
     private static Uri instagramPostUri(String url) {
         if (url == null || url.isEmpty()) return null;
         Uri uri = Uri.parse(url);
-        String host = uri.getHost();
-        if (host == null || !(host.equals("instagram.com") || host.endsWith(".instagram.com"))) return null;
+        if (!MediaResolver.isInstagramHost(uri.getHost())) return null;
         return uri.buildUpon().clearQuery().fragment(null).build();
     }
 

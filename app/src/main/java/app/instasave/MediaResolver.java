@@ -102,17 +102,18 @@ final class MediaResolver {
     private static final String FILENAME_PREFIX = "instasave_";
     private static final Pattern FILENAME_UNSAFE = Pattern.compile("[^A-Za-z0-9._-]");
 
-    Result resolve(String sourceUrl) throws Exception {
-        if (isDirectMediaUrl(sourceUrl)) {
-            String type = sourceUrl.toLowerCase(Locale.ROOT).contains(".mp4") ? "video" : "photo";
-            String extension = type.equals("photo") ? ".jpg" : extensionFor(sourceUrl, ".mp4");
-            MediaItem item = new MediaItem(sourceUrl, "instasave_" + System.currentTimeMillis() + extension,
-                    type, type.equals("photo") ? sourceUrl : null);
+    Result resolve(String requestedUrl) throws Exception {
+        if (isDirectMediaUrl(requestedUrl)) {
+            String type = requestedUrl.toLowerCase(Locale.ROOT).contains(".mp4") ? "video" : "photo";
+            String extension = type.equals("photo") ? ".jpg" : extensionFor(requestedUrl, ".mp4");
+            MediaItem item = new MediaItem(requestedUrl, "instasave_" + System.currentTimeMillis() + extension,
+                    type, type.equals("photo") ? requestedUrl : null);
             return new Result(Collections.singletonList(item));
         }
-        if (!isInstagramPermalink(sourceUrl)) {
+        if (!isInstagramPermalink(requestedUrl)) {
             throw new UserFacingException(R.string.error_unsupported_link);
         }
+        String sourceUrl = onMainHost(requestedUrl);
 
         // Both the permalink and its public embed can expose media variants. Compare their
         // declared resolutions instead of assuming either response always has the largest one.
@@ -258,13 +259,15 @@ final class MediaResolver {
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", "Instasave/1.0 (Android)");
         connection.setRequestProperty("Accept", "text/html,application/xhtml+xml");
-        if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-            throw new UserFacingException(R.string.error_unavailable);
-        }
         StringBuilder body = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) body.append(line);
+        try {
+            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                throw new UserFacingException(R.string.error_unavailable);
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) body.append(line);
+            }
         } finally {
             connection.disconnect();
         }
@@ -635,11 +638,24 @@ final class MediaResolver {
 
     private static boolean isInstagramPermalink(String url) {
         try {
-            String host = new URI(url).getHost();
-            return host != null && (host.equals("instagram.com") || host.equals("www.instagram.com"));
+            return isInstagramHost(new URI(url).getHost());
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    /** The hosts that serve post permalinks; other subdomains (help, about…) don't. Shared with the history. */
+    static boolean isInstagramHost(String host) {
+        if (host == null) return false;
+        String lower = host.toLowerCase(Locale.ROOT);
+        return lower.equals("instagram.com") || lower.equals("www.instagram.com") || lower.equals("m.instagram.com");
+    }
+
+    /** The same permalink on www.instagram.com, the host the page and embed parsing was written against. */
+    private static String onMainHost(String url) throws Exception {
+        URI uri = new URI(url);
+        if ("www.instagram.com".equalsIgnoreCase(uri.getHost())) return url;
+        return new URI("https", "www.instagram.com", uri.getPath(), uri.getQuery(), uri.getFragment()).toString();
     }
 
     private static String openGraphContent(String html, String property) {

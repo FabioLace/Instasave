@@ -302,8 +302,8 @@ public final class MainActivity extends Activity {
     static String extractUrl(String text) {
         int start = text.indexOf("http");
         if (start < 0) return text.trim();
-        int end = text.indexOf(' ', start);
-        return (end < 0 ? text.substring(start) : text.substring(start, end)).trim();
+        // Shared text often puts the caption on the next line, so the link ends at any whitespace.
+        return text.substring(start).split("\\s", 2)[0];
     }
 
     @Override protected void onDestroy() {
@@ -314,7 +314,8 @@ public final class MainActivity extends Activity {
         resolverExecutor.shutdownNow();
         imageExecutor.shutdownNow();
         metadataExecutor.shutdownNow();
-        saveExecutor.shutdownNow();
+        // Like the bubble's sheet: a photo that's being saved finishes after the screen is closed.
+        saveExecutor.shutdown();
         super.onDestroy();
     }
 }

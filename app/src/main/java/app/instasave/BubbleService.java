@@ -62,7 +62,10 @@ public final class BubbleService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) stopSelf();
+        if (intent != null && ACTION_STOP.equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
+        // Every startForegroundService() call must be followed by startForeground(), also when the
+        // service is already running, or Android stops the app.
+        startInForeground();
         return START_STICKY;
     }
 

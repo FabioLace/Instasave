@@ -16,8 +16,10 @@
         android:label="${appLabel}"
         android:theme="@style/Theme.Instasave"
         android:usesCleartextTraffic="false">
+        <!-- Rotation keeps the activity, so an analysis, its preview and running saves survive it. -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
